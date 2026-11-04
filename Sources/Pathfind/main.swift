@@ -1,4 +1,5 @@
 import AppKit
+import CoreServices
 
 let app = NSApplication.shared
 let delegate = AppDelegate()
@@ -9,6 +10,33 @@ app.run()
 final class AppDelegate: NSObject, NSApplicationDelegate, SettingsPresenting {
     private let workspace = BrowserWorkspace()
     private var settings: SettingsController?
+    private var launched = false
+    private var pendingRequests: [([URL], Bool)] = []
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        NSAppleEventManager.shared().setEventHandler(self, andSelector: #selector(revealFiles(_:withReply:)),
+            forEventClass: AEEventClass(kAEMiscStandards), andEventID: AEEventID(kAEMakeObjectsVisible))
+    }
+    func application(_ sender: NSApplication, open urls: [URL]) { openFiles(urls, revealing: false) }
+    @objc private func revealFiles(_ event: NSAppleEventDescriptor, withReply reply: NSAppleEventDescriptor) {
+        let urls = FileViewerRequest.urls(in: event)
+        guard !urls.isEmpty else {
+            reply.setParam(NSAppleEventDescriptor(int32: Int32(errAEParamMissed)), forKeyword: AEKeyword(keyErrorNumber))
+            return
+        }
+        openFiles(urls, revealing: true)
+    }
+    private func openFiles(_ urls: [URL], revealing: Bool) {
+        guard launched else { pendingRequests.append((urls, revealing)); return }
+        let groups = Dictionary(grouping: urls.filter(\.isFileURL)) { url in
+            !revealing && (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+                ? url.standardizedFileURL : url.deletingLastPathComponent().standardizedFileURL
+        }
+        for folder in groups.keys.sorted(by: { $0.path < $1.path }) {
+            let browser = workspace.newWindow(at: folder)
+            browser.navigate(folder, selecting: (groups[folder] ?? []).filter { revealing || $0.standardizedFileURL != folder })
+        }
+        app.activate(ignoringOtherApps: true)
+    }
     func applicationDidFinishLaunching(_ notification: Notification) {
         let menu = NSMenu()
         let appItem = NSMenuItem()
@@ -32,6 +60,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SettingsPresenting {
         editItem.submenu = edit
         app.mainMenu = menu
         workspace.restore()
+        launched = true
+        for (urls, revealing) in pendingRequests { openFiles(urls, revealing: revealing) }
+        pendingRequests.removeAll()
         app.activate(ignoringOtherApps: true)
     }
     @objc func showSettings() {

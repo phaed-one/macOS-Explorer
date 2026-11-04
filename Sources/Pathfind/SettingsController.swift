@@ -14,6 +14,8 @@ final class SettingsController: NSWindowController {
     private let titlebarPercentage = NSTextField(labelWithString: "")
     private let resetTitlebarButton = NSButton(title: "Use Default Tint", target: nil, action: nil)
     private let outlineColor = AnchoredColorWell()
+    private let defaultManagerStatus = NSTextField(wrappingLabelWithString: "")
+    private let defaultManagerButton = NSButton(title: "Use Explorer as Default", target: nil, action: nil)
     init() {
         BrowserTheme.initializeAccent()
         let window = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 560, height: 570), styleMask: [.titled, .closable, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -21,6 +23,14 @@ final class SettingsController: NSWindowController {
         window.becomesKeyOnlyIfNeeded = true
         super.init(window: window)
         window.title = "Explorer Settings"
+        let managerTitle = NSTextField(labelWithString: "Default File Manager")
+        managerTitle.font = .systemFont(ofSize: 17, weight: .semibold)
+        defaultManagerButton.target = self; defaultManagerButton.action = #selector(useDefaultManager)
+        let managerButtons = NSStackView(views: [defaultManagerButton,
+            NSButton(title: "Restore Finder", target: self, action: #selector(restoreFinder))])
+        let managerHint = NSTextField(wrappingLabelWithString: "Open folders and compatible Show in Finder requests in Explorer. Reopen other apps after changing this; some may require signing out and back in. System Open/Save dialogs stay unchanged. macOS keeps Finder in the first Dock position.")
+        managerHint.textColor = .secondaryLabelColor
+        updateDefaultManagerStatus()
         let title = NSTextField(labelWithString: "Appearance")
         title.font = .systemFont(ofSize: 17, weight: .semibold)
         let glass = NSButton(checkboxWithTitle: "Liquid Glass pane backgrounds", target: self, action: #selector(toggleGlass(_:)))
@@ -96,7 +106,7 @@ final class SettingsController: NSWindowController {
         let appPath = NSTextField(wrappingLabelWithString: Bundle.main.bundleURL.path)
         appPath.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
         appPath.textColor = .secondaryLabelColor; appPath.isSelectable = true
-        let stack = NSStackView(views: [title, glass, opacityRow, frostingRow, frostingHint, tintRow, description, titlebarHeading, enableTitlebar, titlebarTintRow, titlebarOpacityRow, accentHeading, accentRow, accentHint, outlineHeading, enableOutline, outlineRow, accessTitle, accessGuide, accessButtons, appPath])
+        let stack = NSStackView(views: [managerTitle, defaultManagerStatus, managerButtons, managerHint, title, glass, opacityRow, frostingRow, frostingHint, tintRow, description, titlebarHeading, enableTitlebar, titlebarTintRow, titlebarOpacityRow, accentHeading, accentRow, accentHint, outlineHeading, enableOutline, outlineRow, accessTitle, accessGuide, accessButtons, appPath])
         stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 18
         stack.translatesAutoresizingMaskIntoConstraints = false
         let scroll = BrowserScrollView(frame: window.contentView!.bounds)
@@ -109,6 +119,8 @@ final class SettingsController: NSWindowController {
         document.addSubview(stack)
         NSLayoutConstraint.activate([stack.topAnchor.constraint(equalTo: document.topAnchor, constant: 24), stack.leadingAnchor.constraint(equalTo: document.leadingAnchor, constant: 24), stack.trailingAnchor.constraint(equalTo: document.trailingAnchor, constant: -24), description.widthAnchor.constraint(equalTo: stack.widthAnchor)])
         accessGuide.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        managerHint.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        defaultManagerStatus.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         frostingHint.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         accentHint.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         appPath.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
@@ -117,6 +129,19 @@ final class SettingsController: NSWindowController {
         window.center()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    private func updateDefaultManagerStatus() {
+        let active = DefaultFileManager.isDefault
+        defaultManagerStatus.stringValue = active ? "Explorer is your default file manager." : "Explorer is not your default file manager."
+        defaultManagerButton.isEnabled = !active
+    }
+    @objc private func useDefaultManager() {
+        do { try DefaultFileManager.useExplorer(); updateDefaultManagerStatus() }
+        catch { NSAlert(error: error).runModal() }
+    }
+    @objc private func restoreFinder() {
+        do { try DefaultFileManager.restoreFinder(); updateDefaultManagerStatus() }
+        catch { NSAlert(error: error).runModal() }
+    }
     @objc private func openFullDiskAccess() {
         let destination = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
         if !NSWorkspace.shared.open(destination) {

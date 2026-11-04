@@ -315,6 +315,7 @@ do {
     try require(!(defaults.stringArray(forKey: "explicitExpandedTreePaths") ?? []).contains("/"), "Double-click collapse must be saved")
     print("PASS: Native double-click action expands/collapses tree folders and saves the choice")
     try checkWindowTransfers()
+    try checkFileViewerRequests()
     try checkTrashInterface()
     try checkFavoriteAndVisibilityControls()
     try checkFavoriteReordering()

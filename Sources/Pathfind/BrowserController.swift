@@ -342,13 +342,20 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         contentPane.headerHeight = 40
     }
 
-    func navigate(_ destination: URL, record: Bool = true, historyOnSuccess: NavigationHistory? = nil) {
+    func navigate(_ destination: URL, record: Bool = true, historyOnSuccess: NavigationHistory? = nil, selecting urls: [URL] = []) {
         guard !busy else { return }
         pathCompletion?.dismiss()
         indexedSearch.cancel()
         let url = destination.isFileURL && trashStore.isRoot(destination) ? TrashStore.location : destination
+        if !hiddenFiles.showsHidden(in: url), urls.contains(where: {
+            $0.lastPathComponent.hasPrefix(".") || (try? $0.resourceValues(forKeys: [.isHiddenKey]).isHidden) == true
+        }) {
+            hiddenFiles.set(true, for: url)
+        }
         request += 1
-        let version = request, preferences = viewStore.view(for: url), showHidden = hiddenFiles.showsHidden(in: url)
+        var preferences = viewStore.view(for: url)
+        if !urls.isEmpty { preferences.filter = "" }
+        let version = request, showHidden = hiddenFiles.showsHidden(in: url)
         status.stringValue = "Loading \(url.path)…"
         queue.async {
             let result = Result { try url == TrashStore.location ? self.trashStore.contents(showHidden: showHidden) : FileSystem.contents(of: url, showHidden: showHidden) }
@@ -368,6 +375,17 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
                     self.creationButtons.forEach { $0.isEnabled = !self.isTrashBrowsing }
                     self.table.deselectAll(nil)
                     self.applyFilter()
+                    if !urls.isEmpty {
+                        let selected = Set(urls.map(\.standardizedFileURL))
+                        let indexes = self.visible.indices.filter { selected.contains(self.visible[$0].url.standardizedFileURL) }
+                        self.table.selectRowIndexes(IndexSet(indexes), byExtendingSelection: false)
+                        self.icons.collection.selectionIndexPaths = Set(indexes.map { IndexPath(item: $0, section: 0) })
+                        if let first = indexes.first {
+                            self.table.scrollRowToVisible(first)
+                            self.icons.collection.scrollToItems(at: [IndexPath(item: first, section: 0)], scrollPosition: .nearestHorizontalEdge)
+                        }
+                        self.updateStatus()
+                    }
                 case .failure(let error):
                     self.path.stringValue = BrowserLocation.path(self.current)
                     self.updateStatus()
