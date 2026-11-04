@@ -24,34 +24,12 @@ Windows File Explorer's editable path bar, full-disk folder tree, combined with 
 - A permissions editor that takes octal (`755`) or chmod-style strings (`u+x,go-w`).
 - Liquid Glass window on macOS 26, with opacity, frosting and tint settings, plus custom titlebar tint, accent color and window outline.
 
-## Build
+## Install
 
-```sh
-zsh scripts/setup-signing.sh # once on your Mac
-zsh scripts/setup-updates.sh # once; preserves the update-signing key in Keychain
-zsh scripts/build-app.sh
-open dist/Explorer.app
-```
+Download the ZIP from the [latest release](https://github.com/phaed-one/macOS-Explorer/releases/latest),
+unzip it, and move **Explorer.app** into **Applications**.
 
-Each successful build increments the patch version and build number in `Resources/Info.plist`
-and creates `dist/Explorer-<version>.zip`. Older ZIPs are kept. Failed compilation or
-packaging does not increment the version. To start a new minor or major release,
-edit `CFBundleShortVersionString` before building.
-
-To replace a build while keeping its app version, run
-`zsh scripts/build-app.sh --same-version`. This increments only the build number
-and creates `dist/Explorer-<version>-build<build>.zip`.
-Use `zsh scripts/build-app.sh --version X.Y.Z` to build an explicitly chosen
-release version. If that ZIP already exists locally, the new archive includes its
-build number so the earlier build is preserved.
-
-Local builds reuse the **Explorer Local Code Signing** certificate and private key
-in your user Keychain. Keep that identity: replacing it changes the app's identity
-and can reset macOS privacy permissions. The first update from an older ad-hoc
-build requires granting Full Disk Access once more. Subsequent updates using the
-same certificate retain a stable signing identity. This self-signed certificate is
-for local use; public distribution still needs Apple Developer ID signing and
-notarization for Gatekeeper trust.
+## Using Explorer
 
 In Explorer → Settings → Default File Manager, choose **Use Explorer as Default**
 to send “Show in Finder” requests from other apps to Explorer. **Restore Finder**
@@ -81,25 +59,6 @@ relaunches the app through its standard installation flow. No update popups or
 automatic downloads occur during the launch check. Offline failures appear only
 in Settings, with a retry button.
 
-Updates use [Sparkle 2.10.1](https://sparkle-project.org/), the app's only external
-dependency. Both update archives and appcast feeds carry Ed25519 signatures;
-the private key stays in the user's Keychain under account `local.pathfind.app`.
-Keep that key as well as the local code-signing certificate for future releases.
-The builder creates `dist/appcast.xml` and `dist/release.json` with every ZIP.
-After committing and pushing a built version, publish it with
-`node --env-file=.env scripts/publish-release.mjs`. This uploads the signed ZIP
-and appcast, publishes the release, and replaces `/Applications/Explorer.app`
-after stopping any running Explorer instance.
-
-To regenerate the app icon (needs `rsvg-convert`): `zsh scripts/make-icon.sh`
-
-## Tests
-
-```sh
-swift run PathfindChecks
-zsh scripts/check-native.sh
-```
-
 ## Not supported yet
 
 - Connecting to network servers (mounted shares work)
@@ -125,3 +84,8 @@ zsh scripts/check-native.sh
 | Next tab | ⌃Tab |
 | New window | ⌘N |
 | Settings | ⌘, |
+
+## Development
+
+See the [development guide](docs/development.md) for building, testing, signing,
+and publishing releases.
