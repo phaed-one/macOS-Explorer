@@ -19,7 +19,8 @@ Windows File Explorer's editable path bar, full-disk folder tree, combined with 
 - Hidden files shown for one folder only, or for all folders. `/` shows `/usr`, `/bin` and other hidden system folders out of the box.
 - New empty files, from the toolbar or the right-click menu.
 - Windows-style keys: F2 renames, Return opens.
-- Right-drag to move files.
+- Drag tabs out to create new windows.
+- Drag files and folders onto other tabs to copy them; right-drag to move them.
 - Search that covers the current folder and its subfolders by default, using the Spotlight index.
 - A permissions editor that takes octal (`755`) or chmod-style strings (`u+x,go-w`).
 - Liquid Glass window on macOS 26, with opacity, frosting and tint settings, plus custom titlebar tint, accent color and window outline.
