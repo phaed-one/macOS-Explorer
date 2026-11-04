@@ -321,6 +321,7 @@ do {
     try checkFavoriteReordering()
     try checkInitialFavoriteOrder()
     try checkTerminalIntegration()
+    try MainActor.assumeIsolated { try checkUpdateInterface() }
     try checkFolderDropsAddFavorites()
     try checkNameConflictPrompts()
     try checkLiveFolderUpdates()

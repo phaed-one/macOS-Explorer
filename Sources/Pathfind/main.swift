@@ -64,6 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SettingsPresenting {
         for (urls, revealing) in pendingRequests { openFiles(urls, revealing: revealing) }
         pendingRequests.removeAll()
         app.activate(ignoringOtherApps: true)
+        AppUpdater.shared.start()
     }
     @objc func showSettings() {
         if settings == nil { settings = SettingsController() }

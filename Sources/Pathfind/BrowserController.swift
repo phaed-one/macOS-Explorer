@@ -19,6 +19,8 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     private let trashActions: TrashActions
     private var creationButtons: [NSButton] = []
     private var favoriteButton: NSButton?
+    private var settingsButton: NSButton?
+    private let updateBadge = UpdateBadgeView()
     private let ancestorPathBar = AncestorPathBar()
     private let folderWatcher = FolderWatcher()
     private let indexedSearch: IndexedFolderSearch
@@ -239,6 +241,13 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         favorite.setButtonType(.toggle)
         favorite.isEnabled = false
         favoriteButton = favorite
+        let settings = button("gearshape", "Settings (⌘,)", #selector(showSettings))
+        settingsButton = settings
+        updateBadge.translatesAutoresizingMaskIntoConstraints = false
+        settings.addSubview(updateBadge)
+        NSLayoutConstraint.activate([updateBadge.widthAnchor.constraint(equalToConstant: 8), updateBadge.heightAnchor.constraint(equalToConstant: 8), updateBadge.trailingAnchor.constraint(equalTo: settings.trailingAnchor), updateBadge.topAnchor.constraint(equalTo: settings.topAnchor)])
+        NotificationCenter.default.addObserver(self, selector: #selector(updateIndicatorChanged), name: AppUpdater.changed, object: nil)
+        updateIndicatorChanged()
         let commands = NSStackView(views: [
             creationButtons[0], creationButtons[1],
             divider(), button("scissors", "Cut (⌘X)", #selector(cutFiles)),
@@ -248,7 +257,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             button("trash", "Move to Trash (⌘Delete)", #selector(trash)),
             divider(), sortControl, viewToggle, viewControl, iconSlider, divider(), hidden, folderHidden,
             favorite, spacer,
-            button("gearshape", "Settings (⌘,)", #selector(showSettings))
+            settings
         ])
         commands.spacing = 10; commands.heightAnchor.constraint(equalToConstant: 36).isActive = true
         let top = NSStackView(views: [navigation, commands])
@@ -616,6 +625,11 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     private var selection: [FileEntry] {
         let indexes = !isSearching && folderView.mode == .icons ? icons.collection.selectionIndexPaths.map(\.item).sorted() : Array(table.selectedRowIndexes)
         return indexes.compactMap { visible.indices.contains($0) ? visible[$0] : nil }
+    }
+    @objc private func updateIndicatorChanged() {
+        let available = AppUpdater.shared.state.hasUpdate
+        updateBadge.isHidden = !available
+        settingsButton?.setAccessibilityLabel(available ? "Settings — update available" : "Settings")
     }
     func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === viewMenu { rebuildViewMenu(); return }

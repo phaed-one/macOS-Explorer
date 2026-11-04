@@ -23,6 +23,7 @@ final class SettingsController: NSWindowController {
         window.becomesKeyOnlyIfNeeded = true
         super.init(window: window)
         window.title = "Explorer Settings"
+        let updates = UpdateStatusView()
         let managerTitle = NSTextField(labelWithString: "Default File Manager")
         managerTitle.font = .systemFont(ofSize: 17, weight: .semibold)
         defaultManagerButton.target = self; defaultManagerButton.action = #selector(useDefaultManager)
@@ -106,7 +107,7 @@ final class SettingsController: NSWindowController {
         let appPath = NSTextField(wrappingLabelWithString: Bundle.main.bundleURL.path)
         appPath.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
         appPath.textColor = .secondaryLabelColor; appPath.isSelectable = true
-        let stack = NSStackView(views: [managerTitle, defaultManagerStatus, managerButtons, managerHint, title, glass, opacityRow, frostingRow, frostingHint, tintRow, description, titlebarHeading, enableTitlebar, titlebarTintRow, titlebarOpacityRow, accentHeading, accentRow, accentHint, outlineHeading, enableOutline, outlineRow, accessTitle, accessGuide, accessButtons, appPath])
+        let stack = NSStackView(views: [updates, managerTitle, defaultManagerStatus, managerButtons, managerHint, title, glass, opacityRow, frostingRow, frostingHint, tintRow, description, titlebarHeading, enableTitlebar, titlebarTintRow, titlebarOpacityRow, accentHeading, accentRow, accentHint, outlineHeading, enableOutline, outlineRow, accessTitle, accessGuide, accessButtons, appPath])
         stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 18
         stack.translatesAutoresizingMaskIntoConstraints = false
         let scroll = BrowserScrollView(frame: window.contentView!.bounds)
@@ -120,6 +121,7 @@ final class SettingsController: NSWindowController {
         NSLayoutConstraint.activate([stack.topAnchor.constraint(equalTo: document.topAnchor, constant: 24), stack.leadingAnchor.constraint(equalTo: document.leadingAnchor, constant: 24), stack.trailingAnchor.constraint(equalTo: document.trailingAnchor, constant: -24), description.widthAnchor.constraint(equalTo: stack.widthAnchor)])
         accessGuide.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         managerHint.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        updates.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         defaultManagerStatus.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         frostingHint.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         accentHint.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true

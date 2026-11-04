@@ -53,24 +53,35 @@ fi
 
 swift build -c release
 BIN_DIR="$(swift build -c release --show-bin-path)"
+PUBLIC_KEY=$("$PWD/.build/artifacts/sparkle/Sparkle/bin/generate_keys" --account local.pathfind.app -p)
+EXPECTED_KEY=$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' Resources/Info.plist)
+if [[ "$PUBLIC_KEY" != "$EXPECTED_KEY" ]]; then
+    echo "The update signing key does not match this app. Restore the original Sparkle key in your Keychain." >&2
+    exit 1
+fi
 STAGING=$(mktemp -d "$PWD/dist/.package.XXXXXX")
 APP="$STAGING/Explorer.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+mkdir -p "$APP/Contents/Frameworks"
+ditto "$BIN_DIR/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
 cp "$BIN_DIR/Explorer" "$APP/Contents/MacOS/Explorer"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $NEXT_VERSION" "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEXT_BUILD" "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$APP"
-codesign --verify --strict "$APP"
+codesign --verify --deep --strict "$APP"
 /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP" "$STAGING/$ARCHIVE_NAME"
 /usr/bin/unzip -tq "$STAGING/$ARCHIVE_NAME"
+python3 scripts/create-appcast.py "$STAGING/$ARCHIVE_NAME" "$APP/Contents/Info.plist" "$STAGING"
 
 # Commit the version only after compilation, signing, and ZIP validation pass.
 cp "$APP/Contents/Info.plist" "$STAGING/Info.plist"
 rm -rf "$PWD/dist/Explorer.app"
 mv "$APP" "$PWD/dist/Explorer.app"
 mv "$STAGING/$ARCHIVE_NAME" "$ZIP"
+mv "$STAGING/appcast.xml" "$PWD/dist/appcast.xml"
+mv "$STAGING/release.json" "$PWD/dist/release.json"
 mv "$STAGING/Info.plist" Resources/Info.plist
 echo "Built $PWD/dist/Explorer.app ($NEXT_VERSION, build $NEXT_BUILD)"
 echo "Packaged $ZIP"

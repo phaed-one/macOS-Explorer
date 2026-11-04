@@ -10,7 +10,7 @@
 
 ![macOS Explorer](docs/screenshot-2.webp)
 
-Windows File Explorer's editable path bar, full-disk folder tree, combined with Finder's Spotlight search, Trash put-back and native look. Multi-tab and multi-window. Native AppKit, no dependencies. Requires macOS 14; Liquid Glass on macOS 26.
+Windows File Explorer's editable path bar, full-disk folder tree, combined with Finder's Spotlight search, Trash put-back and native look. Multi-tab and multi-window. Native AppKit with built-in updates. Requires macOS 14; Liquid Glass on macOS 26.
 
 ## What Finder doesn't have
 
@@ -29,6 +29,7 @@ Windows File Explorer's editable path bar, full-disk folder tree, combined with 
 
 ```sh
 zsh scripts/setup-signing.sh # once on your Mac
+zsh scripts/setup-updates.sh # once; preserves the update-signing key in Keychain
 zsh scripts/build-app.sh
 open dist/Explorer.app
 ```
@@ -73,6 +74,23 @@ Supported terminals: **Terminal, iTerm2, Warp, Warp Preview, Ghostty, kitty,
 Alacritty, WezTerm, Hyper, Tabby, Rio, Contour, Cool Retro Term, and cmux**.
 Only installed applications are offered. The selected folder becomes the terminal's
 working directory. File context menus do not include this action.
+
+Explorer quietly checks for updates at launch. When one is available, an orange
+dot appears on Settings. The Updates section at the top of Settings shows the new
+version and an **Update** button. Sparkle downloads, verifies, replaces, and
+relaunches the app through its standard installation flow. No update popups or
+automatic downloads occur during the launch check. Offline failures appear only
+in Settings, with a retry button.
+
+Updates use [Sparkle 2.10.1](https://sparkle-project.org/), the app's only external
+dependency. Both update archives and appcast feeds carry Ed25519 signatures;
+the private key stays in the user's Keychain under account `local.pathfind.app`.
+Keep that key as well as the local code-signing certificate for future releases.
+The builder creates `dist/appcast.xml` and `dist/release.json` with every ZIP.
+After committing and pushing a built version, publish it with
+`node --env-file=.env scripts/publish-release.mjs`. This uploads the signed ZIP
+and appcast, publishes the release, and replaces `/Applications/Explorer.app`
+after stopping any running Explorer instance.
 
 To regenerate the app icon (needs `rsvg-convert`): `zsh scripts/make-icon.sh`
 
