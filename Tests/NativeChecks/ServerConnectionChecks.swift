@@ -1,6 +1,34 @@
 import AppKit
 
+private final class ServerToolbarDelegate: NSObject, NSApplicationDelegate, ServerConnectionPresenting {
+    var connections = 0
+    func connectToServer() { connections += 1 }
+}
+
 func checkServerConnections() throws {
+    let delegate = ServerToolbarDelegate()
+    let previousDelegate = NSApp.delegate
+    NSApp.delegate = delegate
+    defer { NSApp.delegate = previousDelegate }
+    let browser = BrowserController()
+    defer { browser.close() }
+    let root = browser.window!.contentView!
+    guard let toolbarConnect = descendants(root).compactMap({ $0 as? NSButton }).first(where: { $0.title == "Connect to Server" }) else {
+        throw NativeCheckError.failed("Connect to Server must be directly visible on the toolbar")
+    }
+    for width in [900.0, 1120.0, 1400.0] {
+        browser.window!.setContentSize(NSSize(width: width, height: 740))
+        root.layoutSubtreeIfNeeded()
+        let frame = toolbarConnect.convert(toolbarConnect.bounds, to: root)
+        try require(root.bounds.contains(frame) && frame.width >= toolbarConnect.intrinsicContentSize.width, "The complete server button must fit at every supported window width")
+        let path = descendants(root).compactMap { $0 as? NSTextField }.first { $0.accessibilityLabel() == "Current folder path" }!
+        let search = descendants(root).compactMap { $0 as? NSTextField }.first { $0.accessibilityLabel() == "Search this folder" }!
+        try require(path.frame.width > 150 && search.convert(search.bounds, to: root).maxX < frame.minX, "Server access must not crowd out the path or overlap search")
+    }
+    toolbarConnect.performClick(nil)
+    try require(delegate.connections == 1, "The toolbar button must open the app's connection dialog")
+    print("PASS: Visible Connect to Server toolbar action, full label at 900/1120/1400 widths, and path/search separation")
+
     for (input, expected) in [("server/share", "smb://server/share"), (" smb://server/Team Files ", "smb://server/Team%20Files"),
         ("afp://nas/share", "afp://nas/share"), ("nfs://nas/export", "nfs://nas/export"),
         ("https://nas/dav", "https://nas/dav"), ("http://[::1]:8080/", "http://[::1]:8080/")] {

@@ -7,7 +7,7 @@ app.delegate = delegate
 app.setActivationPolicy(.regular)
 app.run()
 
-final class AppDelegate: NSObject, NSApplicationDelegate, SettingsPresenting {
+final class AppDelegate: NSObject, NSApplicationDelegate, SettingsPresenting, ServerConnectionPresenting {
     private let workspace = BrowserWorkspace()
     private var settings: SettingsController?
     private lazy var serverConnection = ServerConnectionController(onConnected: { [weak self] urls in
@@ -71,10 +71,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SettingsPresenting {
             edit.addItem(withTitle: name, action: Selector(action), keyEquivalent: key)
         }
         editItem.submenu = edit
-        let goItem = NSMenuItem(); menu.addItem(goItem)
-        let go = NSMenu(title: "Go")
-        go.addItem(withTitle: "Connect to Server…", action: #selector(connectToServer), keyEquivalent: "k").target = self
-        goItem.submenu = go
         app.mainMenu = menu
         workspace.restore()
         launched = true
@@ -93,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SettingsPresenting {
         settings?.window?.orderFront(nil)
     }
     @objc private func newWindow() { workspace.newWindow() }
-    @objc private func connectToServer() { serverConnection.present() }
+    @objc func connectToServer() { serverConnection.present() }
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()
         menu.addItem(withTitle: "New Window", action: #selector(newWindow), keyEquivalent: "").target = self

@@ -42,7 +42,7 @@ const terminals = [...source.matchAll(/case \.\w+: return "([^"]+)"/g)].map(matc
 if (terminals.length !== 14) throw new Error('Review the terminal catalog before publishing release notes');
 const body = `### What’s new
 
-- **Connect to Server:** Choose **Go → Connect to Server…** (⌘K) to open shared folders from SMB, AFP, NFS, or WebDAV servers. Sign in when asked and browse the share in Explorer.
+- **Connect to Server:** Click **Connect to Server** on the toolbar (⌘K) to open shared folders from SMB, AFP, NFS, or WebDAV servers. Sign in when asked and browse the share in Explorer.
 - **Full Disk Access setup:** If protected folders are blocked, a setup window appears at launch with a shortcut to System Settings. It closes when access works, with a restart option if needed.
 
 ### Updates
@@ -62,7 +62,12 @@ Uses the same persistent self-signed identity as previous builds. Not Apple Deve
 `;
 
 let release = await api(`releases/tags/${tag}`, {}, true);
-if (release && !release.draft) throw new Error(`${tag} is already published; refusing to replace it without review`);
+if (release && !release.draft) {
+  if (!process.argv.includes('--replace')) throw new Error(`${tag} is already published; use --replace only when replacing this release is explicitly authorized`);
+  const latest = await api('releases/latest');
+  if (release.id !== latest.id) throw new Error('Only the latest release can be replaced');
+  await api(`git/refs/tags/${tag}`, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({sha, force: true})});
+}
 if (!release) release = await api('releases', { method: 'POST', headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ tag_name: tag, target_commitish: sha, name: tag, body, draft: true, prerelease: false }) });
 for (const [name, bytes, type] of [[manifest.asset, archive, 'application/zip'], ['appcast.xml', appcast, 'application/xml']]) {
@@ -79,3 +84,8 @@ const latest = await api('releases/latest');
 if (latest.id !== release.id || latest.body !== body || latest.assets.length < 2) throw new Error('Published release verification failed');
 console.log(`Published ${release.html_url} with verified ZIP and signed appcast`);
 execFileSync('/usr/bin/swift', ['scripts/install-app.swift'], { cwd: root, stdio: 'inherit' });
+if (process.argv.includes('--replace')) {
+  await api('actions/workflows/virustotal.yml/dispatches', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ref: 'main', inputs: {tag}})});
+  console.log('Started VirusTotal scan for the replacement build');
+}

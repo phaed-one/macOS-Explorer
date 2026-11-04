@@ -47,7 +47,7 @@ If protected folders are blocked, Explorer shows a setup window at launch. Enabl
 Full Disk Access using its Settings button; the window closes when access works.
 Restart Explorer if macOS asks.
 
-Choose **Go → Connect to Server…** (⌘K) and enter a server address, such as
+Click **Connect to Server** on the toolbar (⌘K) and enter a server address, such as
 `smb://server/share`. Sign in if asked, then browse the share in Explorer.
 SMB, AFP, NFS, and WebDAV servers are supported.
 

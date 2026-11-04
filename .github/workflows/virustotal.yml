@@ -119,7 +119,7 @@ jobs:
                 body: (scannedRelease.body || '') + heading + `\n\n[Completed VirusTotal report](${report})`});
             }
             const latest = (await github.rest.repos.getLatestRelease(context.repo)).data;
-            if (String(latest.id) !== process.env.RELEASE_ID) {
+            if (String(latest.id) !== process.env.RELEASE_ID || !latest.assets.some(asset => asset.digest === `sha256:${process.env.RELEASE_SHA256}`)) {
               core.info('Older release scanned; leaving the latest-release README badge unchanged');
               return;
             }

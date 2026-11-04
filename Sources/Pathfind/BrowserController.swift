@@ -232,7 +232,15 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             return self.current
         })
         path.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let navigation = NSStackView(views: [path, search])
+        let connect = NSButton(title: "Connect to Server", image: NSImage(systemSymbolName: "server.rack", accessibilityDescription: nil)!, target: self, action: #selector(connectToServer))
+        connect.bezelStyle = .texturedRounded; connect.imagePosition = .imageLeft
+        connect.controlSize = .large
+        connect.heightAnchor.constraint(equalToConstant: 36).isActive = true
+        connect.setContentHuggingPriority(.required, for: .horizontal)
+        connect.setContentCompressionResistancePriority(.required, for: .horizontal)
+        connect.setAccessibilityLabel("Connect to Server")
+        ToolbarHelp.install(on: connect, text: "Connect to Server (⌘K)")
+        let navigation = NSStackView(views: [path, search, connect])
         navigation.spacing = 6
         navigation.heightAnchor.constraint(equalToConstant: 52).isActive = true
         let spacer = NSView(); spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -968,7 +976,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     }
     private func handleCommand(_ event: NSEvent) -> Bool {
         let key = event.charactersIgnoringModifiers?.lowercased() ?? ""
-        let actions: [String: Selector] = ["l": #selector(focusPath), "[": #selector(goBack), "]": #selector(goForward), "r": #selector(refresh), "t": #selector(newTab), "w": #selector(closeActiveTab), "i": #selector(getInfo), ",": #selector(showSettings)]
+        let actions: [String: Selector] = ["l": #selector(focusPath), "[": #selector(goBack), "]": #selector(goForward), "r": #selector(refresh), "t": #selector(newTab), "w": #selector(closeActiveTab), "i": #selector(getInfo), "k": #selector(connectToServer), ",": #selector(showSettings)]
         let shifted: [String: Selector] = ["n": #selector(newFolder), ".": #selector(toggleHidden), ">": #selector(toggleHidden)]
         let action = event.modifierFlags.contains(.shift) ? shifted[key] ?? actions[key] : actions[key]
         if let action { perform(action); return true }
@@ -994,6 +1002,9 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     }
     @objc private func showSettings() {
         (NSApplication.shared.delegate as? SettingsPresenting)?.showSettings()
+    }
+    @objc private func connectToServer() {
+        (NSApplication.shared.delegate as? ServerConnectionPresenting)?.connectToServer()
     }
     @objc private func appearanceChanged() {
         guard let window, let root = window.contentView else { return }

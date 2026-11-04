@@ -49,6 +49,11 @@ This uploads the signed ZIP and appcast, publishes the release, and replaces
 `/Applications/Explorer.app` after stopping any running Explorer instance.
 `GH_TOKEN` is used only by the publishing tool; it is never included in the app.
 
+When the user explicitly requests replacing the latest release, build with
+`--same-version`, commit and push, then publish with `--replace`. This replaces
+the latest release's ZIP and signed feed, moves its source tag to the replacement
+commit, installs the matching build, and starts a fresh VirusTotal scan.
+
 ## Release scans
 
 `.github/workflows/virustotal.yml` scans the published Explorer ZIP on each new

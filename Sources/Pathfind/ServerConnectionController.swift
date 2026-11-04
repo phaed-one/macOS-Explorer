@@ -1,6 +1,8 @@
 import AppKit
 import NetFS
 
+protocol ServerConnectionPresenting: AnyObject { func connectToServer() }
+
 /// Owns the connection dialog and its single cancellable macOS mount request.
 final class ServerConnectionController: NSWindowController, NSWindowDelegate {
     typealias Mount = (URL, @escaping (Result<[URL], Error>) -> Void) throws -> (() -> Void)
