@@ -28,6 +28,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           RELEASE_TAG: ${{ inputs.tag || 'latest' }}
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
         with:
           script: |
             const fs = require('node:fs/promises');
@@ -54,9 +55,23 @@ jobs:
             core.setOutput('file', file);
             core.setOutput('id', String(release.id));
             core.setOutput('sha256', hash);
+            const known = await fetch(`https://www.virustotal.com/api/v3/files/${hash}`, {
+              headers: {'x-apikey': process.env.VT_API_KEY}
+            });
+            if (known.ok) {
+              const attributes = (await known.json()).data.attributes;
+              const stats = attributes.last_analysis_stats;
+              if (attributes.last_analysis_date && stats && ['malicious', 'suspicious', 'harmless', 'undetected'].some(key => stats[key] > 0)) {
+                core.setOutput('stats', JSON.stringify(stats));
+              }
+            } else if (known.status !== 404) {
+              throw new Error(`VirusTotal existing-report lookup failed: HTTP ${known.status}`);
+            }
+            await new Promise(resolve => setTimeout(resolve, 16000));
 
       - name: Submit the published ZIP to VirusTotal
         id: scan
+        if: steps.release.outputs.stats == ''
         uses: cssnr/virustotal-action@e2d194486614b28c3cf884f4bf13e39cac959b8d # v1
         with:
           vt_api_key: ${{ secrets.VT_API_KEY }}
@@ -72,16 +87,17 @@ jobs:
         env:
           VT_API_KEY: ${{ secrets.VT_API_KEY }}
           VT_RESULTS: ${{ steps.scan.outputs.json }}
+          EXISTING_STATS: ${{ steps.release.outputs.stats }}
           RELEASE_ID: ${{ steps.release.outputs.id }}
           RELEASE_SHA256: ${{ steps.release.outputs.sha256 }}
         with:
           script: |
-            const results = JSON.parse(process.env.VT_RESULTS);
-            if (results.length !== 1 || !results[0].id) throw new Error('Missing VirusTotal analysis ID');
+            const results = JSON.parse(process.env.VT_RESULTS || '[]');
+            if (!process.env.EXISTING_STATS && (results.length !== 1 || !results[0].id)) throw new Error('Missing VirusTotal analysis ID');
             const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-            let completed = false;
-            let stats;
-            for (let attempt = 0; attempt < 80; attempt++) {
+            let stats = process.env.EXISTING_STATS ? JSON.parse(process.env.EXISTING_STATS) : undefined;
+            let completed = Boolean(stats);
+            for (let attempt = 0; !completed && attempt < 80; attempt++) {
               await pause(16000);
               const response = await fetch(`https://www.virustotal.com/api/v3/analyses/${encodeURIComponent(results[0].id)}`, {
                 headers: {'x-apikey': process.env.VT_API_KEY}
@@ -95,6 +111,13 @@ jobs:
               }
             }
             if (!completed) throw new Error('VirusTotal analysis is still pending; README badge was not changed');
+            const report = `https://www.virustotal.com/gui/file/${process.env.RELEASE_SHA256}`;
+            const scannedRelease = (await github.rest.repos.getRelease({...context.repo, release_id: Number(process.env.RELEASE_ID)})).data;
+            if (!(scannedRelease.body || '').includes(report)) {
+              const heading = (scannedRelease.body || '').includes('### VirusTotal scan') ? '' : '\n\n### VirusTotal scan';
+              await github.rest.repos.updateRelease({...context.repo, release_id: scannedRelease.id,
+                body: (scannedRelease.body || '') + heading + `\n\n[Completed VirusTotal report](${report})`});
+            }
             const latest = (await github.rest.repos.getLatestRelease(context.repo)).data;
             if (String(latest.id) !== process.env.RELEASE_ID) {
               core.info('Older release scanned; leaving the latest-release README badge unchanged');
