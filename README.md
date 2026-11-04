@@ -39,33 +39,19 @@ the engines that completed the latest release scan; click it for the full report
 
 ## Using Explorer
 
-In Explorer → Settings → Default File Manager, choose **Use Explorer as Default**
-to send “Show in Finder” requests from other apps to Explorer. **Restore Finder**
-switches back. Reopen other apps after changing this; a logout may be needed for
-cached settings. macOS does not let any app take over opening folders, so folders
-double-clicked on the desktop or in the Dock still open in Finder. Apps explicitly
-targeting Finder and system Open/Save dialogs are unaffected.
+Choose **Use Explorer as Default** in Settings to open “Show in Finder” requests
+in Explorer. Folders opened from the desktop or Dock still use Finder.
 
 To see protected folders, give Explorer Full Disk Access in System Settings → Privacy & Security.
 
-Right-click a folder (in the tree or either content view), or empty space in a
-folder, and choose **Open in Terminal**. With only Terminal installed, it opens
-Terminal directly. With exactly one alternative installed, it opens that app
-directly. Direct actions are named **Open in Terminal**, **Open in Warp**, etc.
-With multiple alternatives, a submenu lists the installed apps,
-including Terminal.
+Right-click a folder or empty space to open a terminal in that folder. Explorer
+finds your installed terminals and offers a choice when you have several.
 
 Supported terminals: **Terminal, iTerm2, Warp, Warp Preview, Ghostty, kitty,
 Alacritty, WezTerm, Hyper, Tabby, Rio, Contour, Cool Retro Term, and cmux**.
-Only installed applications are offered. The selected folder becomes the terminal's
-working directory. File context menus do not include this action.
 
-Explorer quietly checks for updates at launch. When one is available, an orange
-dot appears on Settings. The Updates section at the top of Settings shows the new
-version and an **Update** button. Sparkle downloads, verifies, replaces, and
-relaunches the app through its standard installation flow. No update popups or
-automatic downloads occur during the launch check. Offline failures appear only
-in Settings, with a retry button.
+An orange dot on Settings means an update is available. Open Settings and click
+**Update** to install it and restart Explorer.
 
 ## Not supported yet
 
