@@ -10,7 +10,7 @@
 
 ![macOS Explorer](docs/screenshot-2.webp)
 
-Windows File Explorer's editable path bar, full-disk folder tree and cut/paste, combined with Finder's Spotlight search, Trash put-back and native look. Native AppKit, no dependencies. Requires macOS 14; Liquid Glass on macOS 26.
+Windows File Explorer's editable path bar, full-disk folder tree and cut/paste, combined with Finder's Spotlight search, Trash put-back and native look. Multi-tab and multi-window. Native AppKit, no dependencies. Requires macOS 14; Liquid Glass on macOS 26.
 
 ## Features
 
