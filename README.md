@@ -28,6 +28,7 @@ Windows File Explorer's editable path bar, full-disk folder tree, combined with 
 ## Build
 
 ```sh
+zsh scripts/setup-signing.sh # once on your Mac
 zsh scripts/build-app.sh
 open dist/Explorer.app
 ```
@@ -36,6 +37,14 @@ Each successful build increments the patch version and build number in `Resource
 and creates `dist/Explorer-<version>.zip`. Older ZIPs are kept. Failed compilation or
 packaging does not increment the version. To start a new minor or major release,
 edit `CFBundleShortVersionString` before building.
+
+Local builds reuse the **Explorer Local Code Signing** certificate and private key
+in your user Keychain. Keep that identity: replacing it changes the app's identity
+and can reset macOS privacy permissions. The first update from an older ad-hoc
+build requires granting Full Disk Access once more. Subsequent updates using the
+same certificate retain a stable signing identity. This self-signed certificate is
+for local use; public distribution still needs Apple Developer ID signing and
+notarization for Gatekeeper trust.
 
 In Explorer → Settings → Default File Manager, choose **Use Explorer as Default**
 to send “Show in Finder” requests from other apps to Explorer. **Restore Finder**

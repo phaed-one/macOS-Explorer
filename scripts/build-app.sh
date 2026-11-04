@@ -2,6 +2,12 @@
 set -euo pipefail
 cd "${0:A:h:h}"
 
+SIGNING_IDENTITY="Explorer Local Code Signing"
+if [[ "$(security find-identity -v -p codesigning)" != *"\"$SIGNING_IDENTITY\""* ]]; then
+    echo "Persistent signing identity missing. Run: zsh scripts/setup-signing.sh" >&2
+    exit 1
+fi
+
 # Serialize packaging so simultaneous builds cannot publish the same version.
 mkdir -p dist
 LOCK="$PWD/dist/.build-lock"
@@ -41,7 +47,7 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $NEXT_VERSION" "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEXT_BUILD" "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
-codesign --force --sign - "$APP"
+codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$APP"
 codesign --verify --strict "$APP"
 /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP" "$STAGING/Explorer-${NEXT_VERSION}.zip"
 /usr/bin/unzip -tq "$STAGING/Explorer-${NEXT_VERSION}.zip"
