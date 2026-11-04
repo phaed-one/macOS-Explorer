@@ -1,0 +1,35 @@
+# Swift and app build output
+.build/
+/build/
+/dist/
+DerivedData/
+*.dSYM/
+*.xcarchive/
+*.xcresult/
+
+# Xcode and SwiftPM user settings
+xcuserdata/
+*.xcuserstate
+.swiftpm/xcode/package.xcworkspace/xcuserdata/
+
+# macOS metadata
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+
+# Local environment and signing credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile
+
+# Editor temporary files and logs
+*.swp
+*.swo
+*~
+*.log
