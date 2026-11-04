@@ -167,3 +167,4 @@ The checks are a standalone Swift program, so they run with Apple's Command Line
 
 The code is in two parts. `Sources/Pathfind` is the AppKit app: windows, tabs, the tree, the file views and settings. `Sources/PathfindCore` handles listing folders, sorting, resolving paths, history, Trash records and permissions. The app is not sandboxed. Its bundle identifier is unchanged from earlier builds, so saved windows, favorites and settings carry over.
 # MacOS-Explorer
+# MacOS-Explorer
