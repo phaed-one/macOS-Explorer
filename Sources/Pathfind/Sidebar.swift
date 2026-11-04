@@ -117,7 +117,7 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
             return paths.map { URL(fileURLWithPath: $0) }
         }
         let home = FileManager.default.homeDirectoryForCurrentUser
-        return [home] + ["Desktop", "Documents", "Downloads"].map { home.appendingPathComponent($0) }
+        return [home, URL(fileURLWithPath: "/Applications")] + ["Desktop", "Documents", "Downloads"].map { home.appendingPathComponent($0) }
     }
     private var hiddenVolumePaths: [String] {
         UserDefaults.standard.stringArray(forKey: "hiddenVolumes") ?? []
@@ -347,12 +347,38 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
         publishSharedChange()
         return true
     }
+    /// Folders dropped on the FAVORITES header or between favorites become favorites; dropped on a favorite, they copy into it.
+    private func newFavoriteDrop(_ info: NSDraggingInfo, item: Any?, childIndex: Int) -> (index: Int, folders: [URL])? {
+        guard let group = roots.first, (item as? FolderNode) === group, let children = group.children else { return nil }
+        let urls = FileTransfer.urls(info)
+        let folders = urls.filter { url in
+            let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isPackageKey])
+            return values?.isDirectory == true && values?.isPackage != true
+        }
+        guard !folders.isEmpty, folders.count == urls.count, folders.contains(where: { !isFavorite($0) }) else { return nil }
+        let index = childIndex == NSOutlineViewDropOnItemIndex ? children.count : childIndex
+        return (0...children.count).contains(index) ? (index, folders) : nil
+    }
+    private func addFavorites(_ urls: [URL], at index: Int) {
+        var paths = favorites.map(\.path)
+        var added: [String] = []
+        for url in urls where !isFavorite(url) && !added.contains(url.standardizedFileURL.path) {
+            added.append(url.standardizedFileURL.path)
+        }
+        paths.insert(contentsOf: added, at: min(index, paths.count))
+        UserDefaults.standard.set(paths, forKey: "favorites")
+        publishSharedChange()
+    }
     func outlineView(_ outlineView: NSOutlineView, validateDrop info: NSDraggingInfo, proposedItem item: Any?, proposedChildIndex index: Int) -> NSDragOperation {
         if let path = info.draggingPasteboard.string(forType: Self.favoriteDragType) {
             guard info.draggingSource is FolderOutlineView, favorites.contains(where: { $0.path == path }),
                   let insertionIndex = favoriteDropIndex(item: item, childIndex: index) else { return [] }
             outlineView.setDropItem(roots.first, dropChildIndex: insertionIndex)
             return .move
+        }
+        if let drop = newFavoriteDrop(info, item: item, childIndex: index) {
+            outlineView.setDropItem(roots.first, dropChildIndex: drop.index)
+            return [.link, .copy, .generic, .move].first { info.draggingSourceOperationMask.contains($0) } ?? []
         }
         guard let node = item as? FolderNode, node.url != nil else { return [] }
         outlineView.setDropItem(node, dropChildIndex: NSOutlineViewDropOnItemIndex)
@@ -363,6 +389,10 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
             guard info.draggingSource is FolderOutlineView,
                   let insertionIndex = favoriteDropIndex(item: item, childIndex: index) else { return false }
             return moveFavorite(path: path, to: insertionIndex)
+        }
+        if let drop = newFavoriteDrop(info, item: item, childIndex: index) {
+            addFavorites(drop.folders, at: drop.index)
+            return true
         }
         guard let node = item as? FolderNode, let destination = node.url else { return false }
         return FileTransfer.accept(info, destination: destination, perform: onDrop)

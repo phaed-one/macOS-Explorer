@@ -107,6 +107,51 @@ func checkTransfers() throws {
         catch {}
     }
 }
+func checkNameConflicts() throws {
+    try fixture { root in
+        let fm = FileManager.default
+        let incoming = root.appendingPathComponent("incoming"), target = root.appendingPathComponent("target")
+        for folder in [incoming, target] { try fm.createDirectory(at: folder, withIntermediateDirectories: false) }
+        let source = incoming.appendingPathComponent("Tool.app"), existing = target.appendingPathComponent("Tool.app")
+        for (bundle, text) in [(source, "new"), (existing, "old")] {
+            try fm.createDirectory(at: bundle, withIntermediateDirectories: false)
+            try Data(text.utf8).write(to: bundle.appendingPathComponent("version"))
+        }
+        func version(_ bundle: URL) throws -> String { String(decoding: try Data(contentsOf: bundle.appendingPathComponent("version")), as: UTF8.self) }
+        var trashed: [String] = []
+        let trash: (URL) throws -> Void = { url in trashed.append(try version(url)); try fm.removeItem(at: url) }
+
+        try FileSystem.transfer(source, into: target, move: false, conflict: .keepBoth, trash: trash)
+        try expect(try version(target.appendingPathComponent("Tool 2.app")) == "new", "Keep Both numbers the name before the extension")
+        try FileSystem.transfer(source, into: target, move: false, conflict: .keepBoth, trash: trash)
+        try expect(fm.fileExists(atPath: target.appendingPathComponent("Tool 3.app").path), "Keep Both skips names already taken")
+        try expect(try version(existing) == "old" && trashed.isEmpty, "Keep Both never touches the existing item")
+
+        try FileSystem.transfer(source, into: target, move: false, conflict: .replace, trash: trash)
+        try expect(try version(existing) == "new" && trashed == ["old"], "Replace hands the old item to the trash and puts the copy in its place")
+        try expect(fm.fileExists(atPath: source.path), "A replacing copy keeps the source")
+        let leftovers = try fm.contentsOfDirectory(atPath: target.path).filter { $0.hasPrefix(".") }
+        try expect(leftovers.isEmpty, "Replace leaves no staged item behind")
+
+        try Data("newer".utf8).write(to: source.appendingPathComponent("version"))
+        let failing: (URL) throws -> Void = { _ in throw CheckFailure(message: "trash unavailable") }
+        do { try FileSystem.transfer(source, into: target, move: true, conflict: .replace, trash: failing); throw CheckFailure(message: "A failed trash must fail the replace") }
+        catch let failure as CheckFailure where failure.message == "A failed trash must fail the replace" { throw failure }
+        catch {}
+        try expect(try version(existing) == "new" && (try version(source)) == "newer", "A failed replace keeps both the existing item and the source")
+        try expect(try fm.contentsOfDirectory(atPath: target.path).filter { $0.hasPrefix(".") }.isEmpty, "A failed replace cleans up its staged item")
+
+        try FileSystem.transfer(source, into: target, move: true, conflict: .replace, trash: trash)
+        try expect(try version(existing) == "newer" && !fm.fileExists(atPath: source.path), "A replacing move removes the source")
+
+        let outer = root.appendingPathComponent("outer"), inner = outer.appendingPathComponent("outer")
+        try fm.createDirectory(at: inner, withIntermediateDirectories: true)
+        do { try FileSystem.transfer(inner, into: root, move: false, conflict: .replace, trash: trash); throw CheckFailure(message: "Must not replace a folder that holds the source") }
+        catch let failure as CheckFailure where failure.message == "Must not replace a folder that holds the source" { throw failure }
+        catch {}
+        try expect(fm.fileExists(atPath: inner.path), "Refusing that replace keeps the source")
+    }
+}
 func checkPermissionModes() throws {
     try expect(try PermissionMode.parse("chmod 0755", original: 0o600, isDirectory: false) == 0o755, "Octal chmod input")
     try expect(try PermissionMode.parse("u+rwx,g-w,o=rx", original: 0o664, isDirectory: false) == 0o745, "Symbolic mode clauses")
@@ -206,6 +251,7 @@ let checks: [(String, () throws -> Void)] = [
     ("Per-folder preferences and default inheritance", checkFolderViews),
     ("Hidden-file defaults, per-folder overrides, restart, and legacy migration", checkHiddenFiles),
     ("Copy/move safety and collision handling", checkTransfers),
+    ("Replace and Keep Both on name clashes", checkNameConflicts),
     ("Safe duplication of files, folders, and symbolic links", checkDuplicate),
     ("Trash journal, restore collisions, Finder metadata, and scoped clearing", checkTrash),
     ("Tab transfer preserves identity and history", checkTabTransfer),

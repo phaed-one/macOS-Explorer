@@ -38,11 +38,11 @@ packaging does not increment the version. To start a new minor or major release,
 edit `CFBundleShortVersionString` before building.
 
 In Explorer → Settings → Default File Manager, choose **Use Explorer as Default**
-to open folders and compatible “Show in Finder” requests in Explorer. **Restore Finder**
-switches both defaults back. Reopen other apps after changing this; a logout may
-be needed for cached settings. Apps explicitly targeting Finder and system Open/Save
-dialogs are unaffected. Finder's fixed Dock icon cannot be hidden through supported
-macOS settings.
+to send “Show in Finder” requests from other apps to Explorer. **Restore Finder**
+switches back. Reopen other apps after changing this; a logout may be needed for
+cached settings. macOS does not let any app take over opening folders, so folders
+double-clicked on the desktop or in the Dock still open in Finder. Apps explicitly
+targeting Finder and system Open/Save dialogs are unaffected.
 
 To see protected folders, give Explorer Full Disk Access in System Settings → Privacy & Security.
 

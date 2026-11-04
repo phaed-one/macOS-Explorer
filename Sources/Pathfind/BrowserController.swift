@@ -755,29 +755,77 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         guard let urls = NSPasteboard.general.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty else { return }
         let destination = current, clipboardVersion = NSPasteboard.general.changeCount
         let moving = NSPasteboard.general.string(forType: FileTransfer.moveType) == "true"
-        var remaining = urls
-        performFileOperation(onCompletion: { _ in
-            guard moving, NSPasteboard.general.changeCount == clipboardVersion else { return }
-            NSPasteboard.general.clearContents()
-            if !remaining.isEmpty {
-                NSPasteboard.general.writeObjects(remaining.map { $0 as NSURL })
-                NSPasteboard.general.setString("true", forType: FileTransfer.moveType)
-            }
-        }) {
-            for source in urls {
-                if destination == TrashStore.location { try self.trashStore.trash(source) }
-                else { try FileSystem.transfer(source, into: destination, move: moving) }
-                remaining.removeFirst()
+        guard !busy else { return }
+        resolveNameConflicts(urls, into: destination) { plan in
+            var remaining = plan.map(\.source)
+            self.performFileOperation(onCompletion: { _ in
+                guard moving, NSPasteboard.general.changeCount == clipboardVersion else { return }
+                NSPasteboard.general.clearContents()
+                if !remaining.isEmpty {
+                    NSPasteboard.general.writeObjects(remaining.map { $0 as NSURL })
+                    NSPasteboard.general.setString("true", forType: FileTransfer.moveType)
+                }
+            }) {
+                for (source, conflict) in plan {
+                    try self.transferOne(source, into: destination, move: moving, conflict: conflict)
+                    remaining.removeFirst()
+                }
             }
         }
     }
     private func transfer(_ urls: [URL], into destination: URL, move: Bool) {
-        performFileOperation {
-            for url in urls {
-                if destination == TrashStore.location { try self.trashStore.trash(url) }
-                else { try FileSystem.transfer(url, into: destination, move: move) }
+        guard !busy else { return }
+        resolveNameConflicts(urls, into: destination) { plan in
+            self.performFileOperation {
+                for (url, conflict) in plan { try self.transferOne(url, into: destination, move: move, conflict: conflict) }
             }
         }
+    }
+    private func transferOne(_ url: URL, into destination: URL, move: Bool, conflict: NameConflict) throws {
+        if destination == TrashStore.location { try trashStore.trash(url); return }
+        try FileSystem.transfer(url, into: destination, move: move, conflict: conflict) { _ = try self.trashStore.trash($0) }
+    }
+    /// Asks, like Finder, what to do with each name already in the destination. Skipped items are left out
+    /// of the plan, and Stop cancels the whole operation.
+    func resolveNameConflicts(_ urls: [URL], into destination: URL, then proceed: @escaping ([(source: URL, conflict: NameConflict)]) -> Void) {
+        let clashes = destination == TrashStore.location ? [] : urls.filter { url in
+            let target = destination.appendingPathComponent(url.lastPathComponent)
+            return FileSystem.itemExists(target) && target.resolvingSymlinksInPath().path != url.resolvingSymlinksInPath().path
+        }
+        guard !clashes.isEmpty, let window else { proceed(urls.map { ($0, .fail) }); return }
+        var choices: [URL: NameConflict?] = [:]
+        func ask(_ index: Int) {
+            guard index < clashes.count else {
+                proceed(urls.compactMap { url in
+                    guard let choice = choices[url] else { return (url, .fail) }
+                    return choice.map { (url, $0) }
+                })
+                return
+            }
+            let url = clashes[index]
+            let alert = NSAlert()
+            alert.messageText = "An item named “\(url.lastPathComponent)” already exists in “\(destination.lastPathComponent)”."
+            alert.informativeText = "Replacing it moves the existing item to the Trash."
+            for title in ["Replace", "Keep Both"] + (clashes.count > 1 ? ["Skip"] : []) + ["Stop"] { alert.addButton(withTitle: title) }
+            if index < clashes.count - 1 {
+                alert.showsSuppressionButton = true
+                alert.suppressionButton?.title = "Apply to All"
+            }
+            alert.beginSheetModal(for: window) { response in
+                let button = response.rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
+                let choice: NameConflict?
+                switch alert.buttons.indices.contains(button) ? alert.buttons[button].title : "Stop" {
+                case "Replace": choice = .replace
+                case "Keep Both": choice = .keepBoth
+                case "Skip": choice = nil
+                default: return
+                }
+                let applyToAll = alert.suppressionButton?.state == .on
+                for clash in clashes[index...(applyToAll ? clashes.count - 1 : index)] { choices[clash] = .some(choice) }
+                ask(applyToAll ? clashes.count : index + 1)
+            }
+        }
+        ask(0)
     }
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? { visible[row].url as NSURL }
     func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int, proposedDropOperation dropOperation: NSTableView.DropOperation) -> NSDragOperation {

@@ -18,13 +18,35 @@ public enum FileSort: String, CaseIterable, Sendable, Codable {
     case name, modified, kind, size
 }
 
+/// What a transfer does when the destination folder already has an item with the same name.
+public enum NameConflict: Sendable {
+    case fail, replace, keepBoth
+}
+
 public enum FileSystem {
+    /// Splits a name so numbering goes before the extension; plain folders keep dots in their name.
+    private static func nameParts(_ source: URL) -> (name: String, suffix: String) {
+        let values = try? source.resourceValues(forKeys: [.isDirectoryKey, .isPackageKey])
+        let hasExtension = values?.isDirectory != true || values?.isPackage == true
+        let suffix = hasExtension && !source.pathExtension.isEmpty ? "." + source.pathExtension : ""
+        return (suffix.isEmpty ? source.lastPathComponent : source.deletingPathExtension().lastPathComponent, suffix)
+    }
+    public static func itemExists(_ url: URL) -> Bool {
+        (try? FileManager.default.attributesOfItem(atPath: url.path)) != nil
+    }
+    /// The first unused "name 2.ext", "name 3.ext", … in a directory, as Finder's Keep Both names them.
+    public static func availableDestination(for source: URL, in directory: URL) -> URL {
+        let (name, suffix) = nameParts(source)
+        var number = 2
+        while true {
+            let candidate = directory.appendingPathComponent("\(name) \(number)\(suffix)")
+            if !itemExists(candidate) { return candidate }
+            number += 1
+        }
+    }
     @discardableResult
     public static func duplicate(_ source: URL) throws -> URL {
-        let values = try source.resourceValues(forKeys: [.isDirectoryKey, .isPackageKey])
-        let hasExtension = values.isDirectory != true || values.isPackage == true
-        let suffix = hasExtension && !source.pathExtension.isEmpty ? "." + source.pathExtension : ""
-        let name = suffix.isEmpty ? source.lastPathComponent : source.deletingPathExtension().lastPathComponent
+        let (name, suffix) = nameParts(source)
         let parent = source.deletingLastPathComponent()
         var number = 1
         while true {
@@ -37,8 +59,10 @@ public enum FileSystem {
             }
         }
     }
-    public static func transfer(_ source: URL, into directory: URL, move: Bool) throws {
-        let destination = directory.appendingPathComponent(source.lastPathComponent)
+    /// `trash` disposes of an item being replaced, so a replaced item stays recoverable.
+    public static func transfer(_ source: URL, into directory: URL, move: Bool, conflict: NameConflict = .fail,
+                                trash: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }) throws {
+        var destination = directory.appendingPathComponent(source.lastPathComponent)
         let originalPath = source.resolvingSymlinksInPath().path
         let targetPath = destination.resolvingSymlinksInPath().path
         var isDirectory: ObjCBool = false
@@ -46,8 +70,33 @@ public enum FileSystem {
         if targetPath == originalPath || (isDirectory.boolValue && targetPath.hasPrefix(originalPath + "/")) {
             throw NSError(domain: "Pathfind", code: 2, userInfo: [NSLocalizedDescriptionKey: "A folder cannot be transferred into itself, and an item cannot replace itself."])
         }
+        if itemExists(destination) {
+            switch conflict {
+            case .fail: break
+            case .keepBoth: destination = availableDestination(for: source, in: directory)
+            case .replace:
+                guard !originalPath.hasPrefix(targetPath + "/") else {
+                    throw NSError(domain: "Pathfind", code: 2, userInfo: [NSLocalizedDescriptionKey: "“\(destination.lastPathComponent)” can’t be replaced because it contains the item being \(move ? "moved" : "copied")."])
+                }
+                try replace(destination, with: source, move: move, trash: trash)
+                return
+            }
+        }
         if move { try FileManager.default.moveItem(at: source, to: destination) }
         else { try FileManager.default.copyItem(at: source, to: destination) }
+    }
+    /// Stages the new item beside the target first, so a failed copy never costs the existing item.
+    private static func replace(_ target: URL, with source: URL, move: Bool, trash: (URL) throws -> Void) throws {
+        let fm = FileManager.default
+        let staged = target.deletingLastPathComponent().appendingPathComponent(".\(target.lastPathComponent).explorer-\(UUID().uuidString)")
+        if move { try fm.moveItem(at: source, to: staged) } else { try fm.copyItem(at: source, to: staged) }
+        do {
+            try trash(target)
+            try fm.moveItem(at: staged, to: target)
+        } catch {
+            if move { try? fm.moveItem(at: staged, to: source) } else { try? fm.removeItem(at: staged) }
+            throw error
+        }
     }
     public static func resolve(_ path: String, relativeTo current: URL) -> URL {
         let expanded = (path as NSString).expandingTildeInPath

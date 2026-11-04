@@ -28,7 +28,7 @@ final class SettingsController: NSWindowController {
         defaultManagerButton.target = self; defaultManagerButton.action = #selector(useDefaultManager)
         let managerButtons = NSStackView(views: [defaultManagerButton,
             NSButton(title: "Restore Finder", target: self, action: #selector(restoreFinder))])
-        let managerHint = NSTextField(wrappingLabelWithString: "Open folders and compatible Show in Finder requests in Explorer. Reopen other apps after changing this; some may require signing out and back in. System Open/Save dialogs stay unchanged. macOS keeps Finder in the first Dock position.")
+        let managerHint = NSTextField(wrappingLabelWithString: "Send Show in Finder requests from other apps to Explorer. Reopen other apps after changing this; some may require signing out and back in. macOS does not let any app take over opening folders, so double-clicked folders on the desktop and in the Dock still open in Finder. System Open/Save dialogs stay unchanged.")
         managerHint.textColor = .secondaryLabelColor
         updateDefaultManagerStatus()
         let title = NSTextField(labelWithString: "Appearance")

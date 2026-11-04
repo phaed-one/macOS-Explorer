@@ -1,7 +1,9 @@
 import AppKit
 import CoreServices
 
-/// Owns the macOS preferences for opening folders and revealing files.
+/// Owns the macOS file viewer preference that "Show in Finder" requests follow.
+/// macOS 26 rejects every request to change the `public.folder` handler (OSStatus -50,
+/// even for Finder itself), so folder opening stays with Finder.
 enum DefaultFileManager {
     static let finderID = "com.apple.finder"
     static var bundleID: String { Bundle.main.bundleIdentifier ?? "local.pathfind.app" }
@@ -9,24 +11,17 @@ enum DefaultFileManager {
         CFPreferencesCopyValue("NSFileViewer" as CFString, kCFPreferencesAnyApplication,
                                kCFPreferencesCurrentUser, kCFPreferencesAnyHost) as? String
     }
-    static var folderHandlerID: String? {
-        LSCopyDefaultRoleHandlerForContentType("public.folder" as CFString, .all)?.takeRetainedValue() as String?
-    }
-    static var isDefault: Bool { viewerID == bundleID && folderHandlerID == bundleID }
+    static var isDefault: Bool { viewerID == bundleID }
     static func useExplorer() throws {
         let status = LSRegisterURL(Bundle.main.bundleURL as CFURL, true)
         guard status == noErr else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
-        try setHandler(bundleID)
+        try setViewer(bundleID)
     }
-    static func restoreFinder() throws { try setHandler(finderID) }
-    private static func setHandler(_ identifier: String) throws {
-        let previous = folderHandlerID ?? finderID
-        let status = LSSetDefaultRoleHandlerForContentType("public.folder" as CFString, .all, identifier as CFString)
-        guard status == noErr else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
+    static func restoreFinder() throws { try setViewer(finderID) }
+    private static func setViewer(_ identifier: String) throws {
         CFPreferencesSetValue("NSFileViewer" as CFString, identifier as CFString,
                               kCFPreferencesAnyApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
         guard CFPreferencesSynchronize(kCFPreferencesAnyApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost) else {
-            LSSetDefaultRoleHandlerForContentType("public.folder" as CFString, .all, previous as CFString)
             throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteUnknownError,
                           userInfo: [NSLocalizedDescriptionKey: "macOS could not save the default file viewer."])
         }

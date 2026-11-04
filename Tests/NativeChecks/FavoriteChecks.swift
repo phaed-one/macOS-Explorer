@@ -57,3 +57,51 @@ func checkFavoriteReordering() throws {
     try require(fileTransfers == 1, "A file drop must still invoke the transfer handler")
     print("PASS: Favorite dragging reorders up/down, persists, synchronizes sidebars, and preserves file drops")
 }
+
+func checkFolderDropsAddFavorites() throws {
+    let defaults = UserDefaults.standard
+    let saved = defaults.object(forKey: "favorites")
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("PathfindFavoriteDrops-\(UUID().uuidString)").standardizedFileURL
+    defer {
+        if let saved { defaults.set(saved, forKey: "favorites") }
+        else { defaults.removeObject(forKey: "favorites") }
+        try? FileManager.default.removeItem(at: root)
+    }
+    let a = root.appendingPathComponent("A"), b = root.appendingPathComponent("B"), c = root.appendingPathComponent("C")
+    let app = root.appendingPathComponent("Tool.app"), file = root.appendingPathComponent("notes.txt")
+    for folder in [a, b, c, app] { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
+    try Data().write(to: file)
+    defaults.set([a.path, b.path], forKey: "favorites")
+    let sidebar = Sidebar()
+    let outline = sidebar.outline
+    var fileTransfers = 0
+    sidebar.onDrop = { _, _, _ in fileTransfers += 1 }
+    func group() -> FolderNode { sidebar.outlineView(outline, child: 0, ofItem: nil) as! FolderNode }
+    func drag(_ urls: [URL]) -> TestDrag {
+        let info = TestDrag()
+        info.draggingPasteboard.writeObjects(urls.map { $0 as NSURL })
+        return info
+    }
+
+    let between = drag([c])
+    try require(sidebar.outlineView(outline, validateDrop: between, proposedItem: group(), proposedChildIndex: 1) == .copy, "A folder dragged between favorites must be accepted")
+    try require(sidebar.outlineView(outline, acceptDrop: between, item: group(), childIndex: 1), "Dropping a folder between favorites must succeed")
+    try require(sidebar.favorites.map(\.path) == [a.path, c.path, b.path], "A dropped folder must be inserted where it was dropped")
+
+    defaults.set([a.path], forKey: "favorites"); sidebar.reload()
+    let header = drag([b, c])
+    try require(sidebar.outlineView(outline, acceptDrop: header, item: group(), childIndex: -1), "Dropping folders on the Favorites header must succeed")
+    try require(sidebar.favorites.map(\.path) == [a.path, b.path, c.path], "Header drops must append every new folder")
+
+    let duplicate = drag([a])
+    try require(sidebar.outlineView(outline, validateDrop: duplicate, proposedItem: group(), proposedChildIndex: 0).isEmpty, "A folder that is already a favorite must not be added again")
+    try require(sidebar.outlineView(outline, validateDrop: drag([app]), proposedItem: group(), proposedChildIndex: 0).isEmpty, "App bundles must not become favorites")
+    try require(sidebar.outlineView(outline, validateDrop: drag([file]), proposedItem: group(), proposedChildIndex: 0).isEmpty, "Files must not become favorites")
+    try require(sidebar.outlineView(outline, validateDrop: drag([c, file]), proposedItem: group(), proposedChildIndex: 0).isEmpty, "A mixed folder and file drag must not become favorites")
+
+    defaults.set([a.path], forKey: "favorites"); sidebar.reload()
+    let onto = drag([c])
+    try require(sidebar.outlineView(outline, acceptDrop: onto, item: group().children![0], childIndex: -1), "Dropping a folder onto a favorite must still copy into it")
+    try require(fileTransfers == 1 && sidebar.favorites.map(\.path) == [a.path], "Dropping onto a favorite must copy, not add a favorite")
+    print("PASS: Folders dropped on the Favorites header or between favorites are added there; drops onto a favorite still copy")
+}

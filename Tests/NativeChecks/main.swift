@@ -319,6 +319,8 @@ do {
     try checkTrashInterface()
     try checkFavoriteAndVisibilityControls()
     try checkFavoriteReordering()
+    try checkFolderDropsAddFavorites()
+    try checkNameConflictPrompts()
     try checkLiveFolderUpdates()
     try checkPathCompletion()
     try checkSearchAndHeaderFocus()
