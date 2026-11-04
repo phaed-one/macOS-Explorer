@@ -49,6 +49,20 @@ This uploads the signed ZIP and appcast, publishes the release, and replaces
 `/Applications/Explorer.app` after stopping any running Explorer instance.
 `GH_TOKEN` is used only by the publishing tool; it is never included in the app.
 
+## Release scans
+
+`.github/workflows/virustotal.yml` scans the published Explorer ZIP on each new
+release. It verifies GitHub's SHA256 digest before submitting, adds report links
+to the release notes, waits for the analysis to finish, and updates the README
+badge only when the scanned release is still the latest one. The signed appcast
+is not submitted as an executable asset.
+
+The workflow uses the repository Actions secret `VT_API_KEY` and its built-in
+`GITHUB_TOKEN` with `contents: write`. It never receives the local publishing PAT
+or either private signing key. Third-party actions are pinned to commit hashes.
+To scan a release again, run **VirusTotal release scan** from GitHub Actions and
+enter its tag, or `latest`.
+
 ## Tests
 
 ```sh

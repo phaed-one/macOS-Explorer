@@ -8,6 +8,9 @@
   A Liquid Glass Finder replacement for macOS.
 </p>
 
+<!-- VIRUSTOTAL_BADGE_START -->
+<!-- VIRUSTOTAL_BADGE_END -->
+
 ![macOS Explorer](docs/screenshot-2.webp)
 
 Windows File Explorer's editable path bar, full-disk folder tree, combined with Finder's Spotlight search, Trash put-back and native look. Multi-tab and multi-window. Native AppKit with built-in updates. Requires macOS 14; Liquid Glass on macOS 26.
