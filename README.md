@@ -9,6 +9,7 @@
 </p>
 
 <!-- VIRUSTOTAL_BADGE_START -->
+[![VirusTotal release scan](https://badges.cssnr.com/vt/sha/c7a9b88b9f3c07fff2e3ddf1adeaeeda2c7fa343d9c9e22e36639627d2b60e04?label=VirusTotal)](https://www.virustotal.com/gui/file/c7a9b88b9f3c07fff2e3ddf1adeaeeda2c7fa343d9c9e22e36639627d2b60e04)
 <!-- VIRUSTOTAL_BADGE_END -->
 
 ![macOS Explorer](docs/screenshot-2.webp)
