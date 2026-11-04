@@ -80,6 +80,7 @@ jobs:
             if (results.length !== 1 || !results[0].id) throw new Error('Missing VirusTotal analysis ID');
             const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
             let completed = false;
+            let stats;
             for (let attempt = 0; attempt < 80; attempt++) {
               await pause(16000);
               const response = await fetch(`https://www.virustotal.com/api/v3/analyses/${encodeURIComponent(results[0].id)}`, {
@@ -88,7 +89,10 @@ jobs:
               if (response.status === 429) { await pause(60000); continue; }
               if (!response.ok) throw new Error(`VirusTotal analysis lookup failed: HTTP ${response.status}`);
               const data = await response.json();
-              if (data.data.attributes.status === 'completed') { completed = true; break; }
+              if (data.data.attributes.status === 'completed') {
+                stats = data.data.attributes.stats;
+                completed = true; break;
+              }
             }
             if (!completed) throw new Error('VirusTotal analysis is still pending; README badge was not changed');
             const latest = (await github.rest.repos.getLatestRelease(context.repo)).data;
@@ -103,7 +107,11 @@ jobs:
             const first = original.indexOf(start), last = original.indexOf(end);
             if (first < 0 || last < first) throw new Error('README badge markers are missing');
             const hash = process.env.RELEASE_SHA256;
-            const badge = `[![VirusTotal release scan](https://badges.cssnr.com/vt/sha/${hash}?label=VirusTotal)](https://www.virustotal.com/gui/file/${hash})`;
+            const detections = (stats.malicious || 0) + (stats.suspicious || 0);
+            const engines = detections + (stats.harmless || 0) + (stats.undetected || 0);
+            if (!engines) throw new Error('Completed analysis has no engine results');
+            const color = detections ? 'red' : 'brightgreen';
+            const badge = `[![VirusTotal release scan: ${detections} detections / ${engines} engines](https://img.shields.io/badge/VirusTotal-${detections}%20%2F%20${engines}-${color})](https://www.virustotal.com/gui/file/${hash})`;
             const updated = original.slice(0, first + start.length) + '\n' + badge + '\n' + original.slice(last);
             if (updated !== original) await github.rest.repos.createOrUpdateFileContents({
               ...context.repo, path: 'README.md', branch: 'main', sha: readme.sha,
