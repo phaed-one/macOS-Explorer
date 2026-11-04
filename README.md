@@ -5,7 +5,7 @@
 <h1 align="center">macOS Explorer</h1>
 
 <p align="center">
-  A Liquid Glass, multi-tab Finder replacement for macOS.
+  A Liquid Glass Finder replacement for macOS.
 </p>
 
 ![macOS Explorer](docs/screenshot-2.webp)
