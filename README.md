@@ -18,6 +18,7 @@ Windows File Explorer's editable path bar, full-disk folder tree and cut/paste, 
 - A sidebar folder tree of the whole disk, starting at `/`, with every mounted drive. App bundles expand like folders.
 - Hidden files shown for one folder only, or for all folders. `/` shows `/usr`, `/bin` and other hidden system folders out of the box.
 - Cut and paste for files.
+- New empty files, from the toolbar or the right-click menu.
 - Windows-style keys: F2 renames, Return opens.
 - Right-drag to move files.
 - Search that covers the current folder and its subfolders by default, using the Spotlight index.
@@ -30,6 +31,18 @@ Windows File Explorer's editable path bar, full-disk folder tree and cut/paste, 
 zsh scripts/build-app.sh
 open dist/Explorer.app
 ```
+
+Each successful build increments the patch version and build number in `Resources/Info.plist`
+and creates `dist/Explorer-<version>.zip`. Older ZIPs are kept. Failed compilation or
+packaging does not increment the version. To start a new minor or major release,
+edit `CFBundleShortVersionString` before building.
+
+In Explorer → Settings → Default File Manager, choose **Use Explorer as Default**
+to open folders and compatible “Show in Finder” requests in Explorer. **Restore Finder**
+switches both defaults back. Reopen other apps after changing this; a logout may
+be needed for cached settings. Apps explicitly targeting Finder and system Open/Save
+dialogs are unaffected. Finder's fixed Dock icon cannot be hidden through supported
+macOS settings.
 
 To see protected folders, give Explorer Full Disk Access in System Settings → Privacy & Security.
 
