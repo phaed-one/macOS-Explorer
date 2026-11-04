@@ -433,6 +433,7 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
     @objc private func clearTrash() { onClearTrash?() }
     // Both folder panes use the persisted favorites and current mount list at menu-open time.
     func appendContextItems(to menu: NSMenu, for url: URL) {
+        TerminalLauncher.shared.appendItem(to: menu, folder: url)
         let saved = isFavorite(url)
         let favorite = menu.addItem(withTitle: saved ? "Remove from Favorites" : "Add to Favorites", action: #selector(toggleFavoriteFromMenu(_:)), keyEquivalent: "")
         favorite.target = self; favorite.representedObject = url

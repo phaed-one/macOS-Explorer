@@ -637,6 +637,9 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
                 item.isEnabled = !busy && NSPasteboard.general.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
             }
         }
+        if !isTrashBrowsing, selection.isEmpty {
+            TerminalLauncher.shared.appendItem(to: menu, folder: current)
+        }
         if !isTrashBrowsing, selection.count == 1, let entry = selection.first, entry.isDirectory {
             menu.addItem(.separator())
             sidebar.appendContextItems(to: menu, for: entry.url)

@@ -178,7 +178,7 @@ do {
     let contextMenu = menuCollection.menu!
     menuCollection.deselectAll(nil)
     browser.menuNeedsUpdate(contextMenu)
-    try require(contextMenu.items.map(\.title) == ["New Folder…", "New File…", "Paste", "Refresh"], "Background menu must contain only folder-background commands")
+    try require(contextMenu.items.prefix(4).map(\.title) == ["New Folder…", "New File…", "Paste", "Refresh"] && contextMenu.items.count == 5 && contextMenu.items.last?.identifier?.rawValue == "openTerminalHere", "Background menu must contain folder-background commands and a terminal action")
     menuCollection.selectionIndexPaths = [IndexPath(item: 0, section: 0)]
     browser.menuNeedsUpdate(contextMenu)
     try require(contextMenu.items.contains { $0.title == "Get Info" } && contextMenu.items.contains { $0.title == "Duplicate" } && !contextMenu.items.contains { $0.title.hasPrefix("New ") }, "Item menus must offer Get Info and Duplicate without creation commands")
@@ -320,6 +320,7 @@ do {
     try checkFavoriteAndVisibilityControls()
     try checkFavoriteReordering()
     try checkInitialFavoriteOrder()
+    try checkTerminalIntegration()
     try checkFolderDropsAddFavorites()
     try checkNameConflictPrompts()
     try checkLiveFolderUpdates()

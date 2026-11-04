@@ -29,9 +29,23 @@ if [[ ! "$VERSION" =~ '^[0-9]+\.[0-9]+\.[0-9]+$' || ! "$BUILD" =~ '^[0-9]+$' ]];
     exit 1
 fi
 PARTS=("${(@s:.:)VERSION}")
-NEXT_VERSION="${PARTS[1]}.${PARTS[2]}.$(( PARTS[3] + 1 ))"
 NEXT_BUILD=$(( BUILD + 1 ))
-ZIP="$PWD/dist/Explorer-${NEXT_VERSION}.zip"
+case "${1:-}" in
+    "") NEXT_VERSION="${PARTS[1]}.${PARTS[2]}.$(( PARTS[3] + 1 ))"; ARCHIVE_NAME="Explorer-${NEXT_VERSION}.zip" ;;
+    --same-version) NEXT_VERSION="$VERSION"; ARCHIVE_NAME="Explorer-${NEXT_VERSION}-build${NEXT_BUILD}.zip" ;;
+    --version)
+        NEXT_VERSION="${2:-}"
+        if [[ ! "$NEXT_VERSION" =~ '^[0-9]+\.[0-9]+\.[0-9]+$' ]]; then
+            echo "--version requires major.minor.patch" >&2; exit 1
+        fi
+        ARCHIVE_NAME="Explorer-${NEXT_VERSION}.zip"
+        if [[ -e "$PWD/dist/$ARCHIVE_NAME" ]]; then
+            ARCHIVE_NAME="Explorer-${NEXT_VERSION}-build${NEXT_BUILD}.zip"
+        fi
+        ;;
+    *) echo "Usage: zsh scripts/build-app.sh [--same-version | --version X.Y.Z]" >&2; exit 1 ;;
+esac
+ZIP="$PWD/dist/$ARCHIVE_NAME"
 if [[ -e "$ZIP" ]]; then
     echo "Archive already exists: $ZIP. Update Resources/Info.plist before rebuilding." >&2
     exit 1
@@ -49,14 +63,14 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$APP"
 codesign --verify --strict "$APP"
-/usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP" "$STAGING/Explorer-${NEXT_VERSION}.zip"
-/usr/bin/unzip -tq "$STAGING/Explorer-${NEXT_VERSION}.zip"
+/usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP" "$STAGING/$ARCHIVE_NAME"
+/usr/bin/unzip -tq "$STAGING/$ARCHIVE_NAME"
 
 # Commit the version only after compilation, signing, and ZIP validation pass.
 cp "$APP/Contents/Info.plist" "$STAGING/Info.plist"
 rm -rf "$PWD/dist/Explorer.app"
 mv "$APP" "$PWD/dist/Explorer.app"
-mv "$STAGING/Explorer-${NEXT_VERSION}.zip" "$ZIP"
+mv "$STAGING/$ARCHIVE_NAME" "$ZIP"
 mv "$STAGING/Info.plist" Resources/Info.plist
 echo "Built $PWD/dist/Explorer.app ($NEXT_VERSION, build $NEXT_BUILD)"
 echo "Packaged $ZIP"

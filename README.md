@@ -38,6 +38,13 @@ and creates `dist/Explorer-<version>.zip`. Older ZIPs are kept. Failed compilati
 packaging does not increment the version. To start a new minor or major release,
 edit `CFBundleShortVersionString` before building.
 
+To replace a build while keeping its app version, run
+`zsh scripts/build-app.sh --same-version`. This increments only the build number
+and creates `dist/Explorer-<version>-build<build>.zip`.
+Use `zsh scripts/build-app.sh --version X.Y.Z` to build an explicitly chosen
+release version. If that ZIP already exists locally, the new archive includes its
+build number so the earlier build is preserved.
+
 Local builds reuse the **Explorer Local Code Signing** certificate and private key
 in your user Keychain. Keep that identity: replacing it changes the app's identity
 and can reset macOS privacy permissions. The first update from an older ad-hoc
@@ -54,6 +61,18 @@ double-clicked on the desktop or in the Dock still open in Finder. Apps explicit
 targeting Finder and system Open/Save dialogs are unaffected.
 
 To see protected folders, give Explorer Full Disk Access in System Settings → Privacy & Security.
+
+Right-click a folder (in the tree or either content view), or empty space in a
+folder, and choose **Open in Terminal**. With only Terminal installed, it opens
+Terminal directly. With exactly one alternative installed, it opens that app
+directly. Direct actions are named **Open in Terminal**, **Open in Warp**, etc.
+With multiple alternatives, a submenu lists the installed apps,
+including Terminal.
+
+Supported terminals: **Terminal, iTerm2, Warp, Warp Preview, Ghostty, kitty,
+Alacritty, WezTerm, Hyper, Tabby, Rio, Contour, Cool Retro Term, and cmux**.
+Only installed applications are offered. The selected folder becomes the terminal's
+working directory. File context menus do not include this action.
 
 To regenerate the app icon (needs `rsvg-convert`): `zsh scripts/make-icon.sh`
 
