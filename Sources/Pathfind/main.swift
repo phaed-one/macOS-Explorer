@@ -10,6 +10,19 @@ app.run()
 final class AppDelegate: NSObject, NSApplicationDelegate, SettingsPresenting {
     private let workspace = BrowserWorkspace()
     private var settings: SettingsController?
+    private lazy var serverConnection = ServerConnectionController(onConnected: { [weak self] urls in
+        guard let self else { return }
+        for (index, url) in urls.enumerated() {
+            if index == 0, let browser = self.workspace.activeBrowser {
+                browser.navigate(url); browser.window?.makeKeyAndOrderFront(nil)
+            } else { self.workspace.newWindow(at: url) }
+        }
+    })
+    private lazy var diskAccess = DiskAccessController(onAccessGranted: { [weak self] in
+        for browser in self?.workspace.browsers.values ?? [:].values {
+            browser.navigate(browser.sessionTabs.current.url, record: false)
+        }
+    })
     private var launched = false
     private var pendingRequests: [([URL], Bool)] = []
     func applicationWillFinishLaunching(_ notification: Notification) {
@@ -58,6 +71,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SettingsPresenting {
             edit.addItem(withTitle: name, action: Selector(action), keyEquivalent: key)
         }
         editItem.submenu = edit
+        let goItem = NSMenuItem(); menu.addItem(goItem)
+        let go = NSMenu(title: "Go")
+        go.addItem(withTitle: "Connect to Server…", action: #selector(connectToServer), keyEquivalent: "k").target = self
+        goItem.submenu = go
         app.mainMenu = menu
         workspace.restore()
         launched = true
@@ -65,6 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SettingsPresenting {
         pendingRequests.removeAll()
         app.activate(ignoringOtherApps: true)
         AppUpdater.shared.start()
+        diskAccess.start()
     }
     @objc func showSettings() {
         if settings == nil { settings = SettingsController() }
@@ -75,6 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SettingsPresenting {
         settings?.window?.orderFront(nil)
     }
     @objc private func newWindow() { workspace.newWindow() }
+    @objc private func connectToServer() { serverConnection.present() }
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()
         menu.addItem(withTitle: "New Window", action: #selector(newWindow), keyEquivalent: "").target = self

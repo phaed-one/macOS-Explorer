@@ -21,6 +21,7 @@ Windows File Explorer's editable path bar, full-disk folder tree, combined with 
 - Windows-style keys: F2 renames, Return opens.
 - Drag tabs out to create new windows.
 - Drag files and folders onto other tabs to copy them; right-drag to move them.
+- Connect to network servers and browse shared folders.
 - Search that covers the current folder and its subfolders by default, using the Spotlight index.
 - A permissions editor that takes octal (`755`) or chmod-style strings (`u+x,go-w`).
 - Liquid Glass window on macOS 26, with opacity, frosting and tint settings, plus custom titlebar tint, accent color and window outline.
@@ -42,7 +43,13 @@ the engines that completed the latest release scan; click it for the full report
 Choose **Use Explorer as Default** in Settings to open “Show in Finder” requests
 in Explorer. Folders opened from the desktop or Dock still use Finder.
 
-To see protected folders, give Explorer Full Disk Access in System Settings → Privacy & Security.
+If protected folders are blocked, Explorer shows a setup window at launch. Enable
+Full Disk Access using its Settings button; the window closes when access works.
+Restart Explorer if macOS asks.
+
+Choose **Go → Connect to Server…** (⌘K) and enter a server address, such as
+`smb://server/share`. Sign in if asked, then browse the share in Explorer.
+SMB, AFP, NFS, and WebDAV servers are supported.
 
 Right-click a folder or empty space to open a terminal in that folder. Explorer
 finds your installed terminals and offers a choice when you have several.
@@ -55,7 +62,6 @@ An orange dot on Settings means an update is available. Open Settings and click
 
 ## Not supported yet
 
-- Connecting to network servers (mounted shares work)
 - Finder tags
 
 ## Keyboard shortcuts
@@ -77,6 +83,7 @@ An orange dot on Settings means an update is available. Open Settings and click
 | New tab / close tab | ⌘T / ⌘W |
 | Next tab | ⌃Tab |
 | New window | ⌘N |
+| Connect to server | ⌘K |
 | Settings | ⌘, |
 
 ## Development

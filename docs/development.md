@@ -65,9 +65,21 @@ enter its tag, or `latest`.
 
 ## Tests
 
+Full Disk Access onboarding tests effective access with public directory operations
+on protected folders, without reading file contents or TCC databases. macOS has no
+public API for the Full Disk Access switch. A privacy denial opens the startup
+window; successful access closes it and refreshes open folders. Missing probe
+directories and ordinary UNIX permission errors remain unknown rather than
+triggering a false warning. Some grants require macOS's Quit & Reopen action.
+
 ```sh
 swift run PathfindChecks
 zsh scripts/check-native.sh
 ```
+
+To exercise a real network mount, run the native checks with
+`PATHFIND_TEST_SERVER` set to a test-share URL. The share must contain
+`Explorer-Network-QA.txt`. The check mounts it through NetFS, verifies the file
+listing, and disconnects it afterward. Only use a disposable test share.
 
 To regenerate the app icon (needs `rsvg-convert`): `zsh scripts/make-icon.sh`.

@@ -99,15 +99,7 @@ final class SettingsController: NSWindowController {
         outlineColor.widthAnchor.constraint(equalToConstant: 50).isActive = true
         outlineColor.heightAnchor.constraint(equalToConstant: 26).isActive = true
         let outlineRow = NSStackView(views: [NSTextField(labelWithString: "Outline color"), outlineColor])
-        let accessTitle = NSTextField(labelWithString: "Filesystem Access")
-        accessTitle.font = .systemFont(ofSize: 17, weight: .semibold)
-        let accessGuide = NSTextField(wrappingLabelWithString: "To browse protected folders without repeated access prompts:\n\n1. Open Full Disk Access below.\n2. Unlock with Touch ID or your password if asked.\n3. Add Explorer with the + button, or drag the app from Finder into the list, and switch it on.\n4. Quit and reopen Explorer.\n\nmacOS may require access to be re-enabled after a local rebuild.")
-        accessGuide.textColor = .secondaryLabelColor
-        let accessButtons = NSStackView(views: [NSButton(title: "Open Full Disk Access…", target: self, action: #selector(openFullDiskAccess)), NSButton(title: "Show Explorer in Finder", target: self, action: #selector(showAppInFinder))])
-        let appPath = NSTextField(wrappingLabelWithString: Bundle.main.bundleURL.path)
-        appPath.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
-        appPath.textColor = .secondaryLabelColor; appPath.isSelectable = true
-        let stack = NSStackView(views: [updates, managerTitle, defaultManagerStatus, managerButtons, managerHint, title, glass, opacityRow, frostingRow, frostingHint, tintRow, description, titlebarHeading, enableTitlebar, titlebarTintRow, titlebarOpacityRow, accentHeading, accentRow, accentHint, outlineHeading, enableOutline, outlineRow, accessTitle, accessGuide, accessButtons, appPath])
+        let stack = NSStackView(views: [updates, managerTitle, defaultManagerStatus, managerButtons, managerHint, title, glass, opacityRow, frostingRow, frostingHint, tintRow, description, titlebarHeading, enableTitlebar, titlebarTintRow, titlebarOpacityRow, accentHeading, accentRow, accentHint, outlineHeading, enableOutline, outlineRow])
         stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 18
         stack.translatesAutoresizingMaskIntoConstraints = false
         let scroll = BrowserScrollView(frame: window.contentView!.bounds)
@@ -119,13 +111,11 @@ final class SettingsController: NSWindowController {
         window.contentView!.addSubview(scroll)
         document.addSubview(stack)
         NSLayoutConstraint.activate([stack.topAnchor.constraint(equalTo: document.topAnchor, constant: 24), stack.leadingAnchor.constraint(equalTo: document.leadingAnchor, constant: 24), stack.trailingAnchor.constraint(equalTo: document.trailingAnchor, constant: -24), description.widthAnchor.constraint(equalTo: stack.widthAnchor)])
-        accessGuide.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         managerHint.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         updates.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         defaultManagerStatus.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         frostingHint.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         accentHint.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-        appPath.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         document.layoutSubtreeIfNeeded()
         document.setFrameSize(NSSize(width: document.frame.width, height: max(scroll.contentSize.height, stack.fittingSize.height + 48)))
         window.center()
@@ -143,15 +133,6 @@ final class SettingsController: NSWindowController {
     @objc private func restoreFinder() {
         do { try DefaultFileManager.restoreFinder(); updateDefaultManagerStatus() }
         catch { NSAlert(error: error).runModal() }
-    }
-    @objc private func openFullDiskAccess() {
-        let destination = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
-        if !NSWorkspace.shared.open(destination) {
-            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
-        }
-    }
-    @objc private func showAppInFinder() {
-        NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
     }
     @objc private func toggleGlass(_ sender: NSButton) {
         UserDefaults.standard.set(sender.state == .on, forKey: "frostedPanes")

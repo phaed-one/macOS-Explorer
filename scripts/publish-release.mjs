@@ -40,29 +40,27 @@ const tag = `v${version}`;
 const source = await readFile(path.join(root, 'Sources/Pathfind/TerminalLauncher.swift'), 'utf8');
 const terminals = [...source.matchAll(/case \.\w+: return "([^"]+)"/g)].map(match => match[1]);
 if (terminals.length !== 14) throw new Error('Review the terminal catalog before publishing release notes');
-const body = `### Built-in updates
+const body = `### What’s new
 
-- Explorer checks quietly for updates each time it starts, without opening update dialogs or downloading updates automatically.
-- A small orange dot on Settings indicates a new release.
-- The Updates section at the top of Settings shows the available version. Click **Update** to download, verify, install, and relaunch through Sparkle's standard update flow.
-- Manual checks and offline retry are available in Settings.
-- Both the update feed and download are signed with Ed25519. Downloads are verified before extraction.
+- **Connect to Server:** Choose **Go → Connect to Server…** (⌘K) to open shared folders from SMB, AFP, NFS, or WebDAV servers. Sign in when asked and browse the share in Explorer.
+- **Full Disk Access setup:** If protected folders are blocked, a setup window appears at launch with a shortcut to System Settings. It closes when access works, with a restart option if needed.
 
-The updater is included starting in 0.1.4. Install this release manually once; future releases can be installed from Settings.
+### Updates
 
-### Folder terminal actions
+An orange dot on Settings tells you when a new version is available. Open Settings and click **Update** to install it and restart Explorer.
 
-Right-click a folder in the tree, Details view, or Icons view, or empty space in the content pane. With no alternatives installed, **Open in Terminal** opens macOS Terminal. With one alternative, the action is named **Open in [app]** and opens it directly. With multiple alternatives, **Open in Terminal** has a native submenu chevron and lists the installed apps, including Terminal. File menus omit this action.
+### Terminal support
 
-Supported terminal applications:
+Right-click a folder or empty space to open a terminal in that folder. Explorer offers your installed terminal apps:
 ${terminals.map(terminal => `- ${terminal}`).join('\n')}
 
-### Requirements and signing
+### Requirements
 
 macOS 14 or later; Liquid Glass requires macOS 26. Apple Silicon build.
 
-The app keeps the same persistent self-signed identity as prior builds. It is not Apple Developer ID signed or notarized. Updates are independently authenticated by Sparkle's signed feed and archive.
+Uses the same persistent self-signed identity as previous builds. Not Apple Developer ID signed or notarized.
 `;
+
 let release = await api(`releases/tags/${tag}`, {}, true);
 if (release && !release.draft) throw new Error(`${tag} is already published; refusing to replace it without review`);
 if (!release) release = await api('releases', { method: 'POST', headers: { 'Content-Type': 'application/json' },
