@@ -80,6 +80,7 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
         expansion = TreeExpansionState(paths: UserDefaults.standard.stringArray(forKey: statePrefix + "explicitExpandedTreePaths") ?? [])
         collapsedGroups = Set(UserDefaults.standard.stringArray(forKey: statePrefix + "collapsedTreeGroups") ?? [])
         super.init()
+        migrateFavoriteOrder()
         let column = NSTableColumn(identifier: .init("folders"))
         outline.addTableColumn(column)
         outline.outlineTableColumn = column
@@ -117,7 +118,19 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
             return paths.map { URL(fileURLWithPath: $0) }
         }
         let home = FileManager.default.homeDirectoryForCurrentUser
-        return [home, URL(fileURLWithPath: "/Applications")] + ["Desktop", "Documents", "Downloads"].map { home.appendingPathComponent($0) }
+        return [URL(fileURLWithPath: "/Applications")] + ["Desktop", "Documents", "Downloads"].map { home.appendingPathComponent($0) } + [home]
+    }
+    private func migrateFavoriteOrder() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: "applicationsFirstFavoriteOrderApplied") else { return }
+        if let paths = defaults.stringArray(forKey: "favorites") {
+            let home = FileManager.default.homeDirectoryForCurrentUser.path
+            let middle = paths.filter { $0 != "/Applications" && $0 != home }
+            let ordered = (paths.contains("/Applications") ? ["/Applications"] : [])
+                + middle + (paths.contains(home) ? [home] : [])
+            defaults.set(ordered, forKey: "favorites")
+        }
+        defaults.set(true, forKey: "applicationsFirstFavoriteOrderApplied")
     }
     private var hiddenVolumePaths: [String] {
         UserDefaults.standard.stringArray(forKey: "hiddenVolumes") ?? []

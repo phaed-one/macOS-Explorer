@@ -1,5 +1,32 @@
 import AppKit
 
+func checkInitialFavoriteOrder() throws {
+    let defaults = UserDefaults.standard
+    let keys = ["favorites", "applicationsFirstFavoriteOrderApplied"]
+    let saved = keys.map { defaults.object(forKey: $0) }
+    defer {
+        for (key, value) in zip(keys, saved) {
+            if let value { defaults.set(value, forKey: key) }
+            else { defaults.removeObject(forKey: key) }
+        }
+    }
+    let home = FileManager.default.homeDirectoryForCurrentUser.path
+    keys.forEach { defaults.removeObject(forKey: $0) }
+    let fresh = Sidebar().favorites.map(\.path)
+    try require(fresh.first == "/Applications" && fresh.last == home, "Applications must be first and Home last for new users")
+    defaults.removeObject(forKey: keys[1])
+    defaults.set([home, "/tmp/Custom-A", "/Applications", "/tmp/Custom-B"], forKey: "favorites")
+    let migrated = Sidebar().favorites.map(\.path)
+    try require(migrated == ["/Applications", "/tmp/Custom-A", "/tmp/Custom-B", home], "Upgrade must move Applications first and Home last while preserving custom favorites")
+    let reordered = [home, "/Applications", "/tmp/Custom-A"]
+    defaults.set(reordered, forKey: "favorites")
+    try require(Sidebar().favorites.map(\.path) == reordered, "After migration, manual favorite ordering must remain available")
+    defaults.removeObject(forKey: keys[1])
+    defaults.set(["/tmp/Only-Custom"], forKey: "favorites")
+    try require(Sidebar().favorites.map(\.path) == ["/tmp/Only-Custom"], "Upgrade must not re-add removed favorites")
+    print("PASS: Applications first and Home last by default and on upgrade; custom favorites and later reordering preserved")
+}
+
 func checkFavoriteReordering() throws {
     let defaults = UserDefaults.standard
     let saved = defaults.object(forKey: "favorites")

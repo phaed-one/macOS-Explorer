@@ -319,6 +319,7 @@ do {
     try checkTrashInterface()
     try checkFavoriteAndVisibilityControls()
     try checkFavoriteReordering()
+    try checkInitialFavoriteOrder()
     try checkFolderDropsAddFavorites()
     try checkNameConflictPrompts()
     try checkLiveFolderUpdates()
