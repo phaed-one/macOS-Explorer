@@ -17,7 +17,6 @@ Windows File Explorer's editable path bar, full-disk folder tree, combined with 
 - An editable path bar, always visible. Type absolute, relative or `~` paths, with folder suggestions as you type.
 - A sidebar folder tree of the whole disk, starting at `/`, with every mounted drive. App bundles expand like folders.
 - Hidden files shown for one folder only, or for all folders. `/` shows `/usr`, `/bin` and other hidden system folders out of the box.
-- Cut and paste for files.
 - New empty files, from the toolbar or the right-click menu.
 - Windows-style keys: F2 renames, Return opens.
 - Right-drag to move files.
