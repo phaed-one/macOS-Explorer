@@ -1,8 +1,16 @@
-# MacOS Explorer
+<p align="center">
+  <img src="docs/icon.png" width="128" height="128" alt="MacOS Explorer icon">
+</p>
 
-A file manager for macOS, meant as a Finder replacement. Native AppKit, no dependencies. Requires macOS 14+.
+<h1 align="center">MacOS Explorer</h1>
+
+<p align="center">
+  A simple file manager for macOS, built as a Finder replacement.
+</p>
 
 ![MacOS Explorer](docs/screenshot.webp)
+
+MacOS Explorer is a file manager for people who want more direct control than Finder gives them. It has an editable path bar, a folder tree of the whole disk, tabs and multiple windows, and per-folder settings for views and hidden files. It is a native AppKit app with no third-party dependencies, and it runs with your normal user permissions. Requires macOS 14 or later.
 
 ## Features
 
