@@ -8,9 +8,9 @@
   A Liquid Glass, multi-tab Finder replacement for macOS.
 </p>
 
-![macOS Explorer](docs/screenshot.webp)
+![macOS Explorer](docs/screenshot-2.webp)
 
-macOS Explorer is a file manager for people who want more direct control than Finder gives them. It has an editable path bar, a folder tree of the whole disk, tabs and multiple windows, and per-folder settings for views and hidden files. It is a native AppKit app with no third-party dependencies, and it runs with your normal user permissions. Requires macOS 14 or later. Liquid Glass needs macOS 26; earlier versions use the standard blur.
+Windows File Explorer's editable path bar, full-disk folder tree and cut/paste, combined with Finder's Spotlight search, Trash put-back and native look. Native AppKit, no dependencies. Requires macOS 14; Liquid Glass on macOS 26.
 
 ## Features
 
