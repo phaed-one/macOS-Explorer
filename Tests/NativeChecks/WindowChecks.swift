@@ -43,7 +43,7 @@ final class TestDrag: NSObject, NSDraggingInfo {
     var draggingLocation = NSPoint.zero
     var draggedImageLocation = NSPoint.zero
     var draggedImage: NSImage? { nil }
-    var draggingSource: Any? { nil }
+    var draggingSource: Any?
     var draggingSequenceNumber: Int { 1 }
     var draggingFormation: NSDraggingFormation = .default
     var animatesToDestination = false

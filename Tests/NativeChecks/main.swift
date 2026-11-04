@@ -317,6 +317,7 @@ do {
     try checkWindowTransfers()
     try checkTrashInterface()
     try checkFavoriteAndVisibilityControls()
+    try checkFavoriteReordering()
     try checkLiveFolderUpdates()
     try checkPathCompletion()
     try checkSearchAndHeaderFocus()

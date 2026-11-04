@@ -69,6 +69,7 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
     private var collapsedGroups: Set<String>
     private let statePrefix: String
     private static let sharedChanged = Notification.Name("PathfindSidebarSharedChanged")
+    private static let favoriteDragType = NSPasteboard.PasteboardType("com.pathfind.favorite")
     private var rebuilding = false
     private var restoringSelection = false
     private var needsSelectionRestore = true
@@ -91,7 +92,9 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
         outline.doubleAction = #selector(toggleClickedFolder)
         outline.onToggle = { [weak self] node, expanded in self?.setExpansion(node, expanded: expanded) }
         outline.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
-        outline.registerForDraggedTypes([.fileURL])
+        outline.registerForDraggedTypes([.fileURL, Self.favoriteDragType])
+        outline.setDraggingSourceOperationMask(.move, forLocal: true)
+        outline.setDraggingSourceOperationMask([], forLocal: false)
         scroll.documentView = outline
         scroll.automaticallyAdjustsContentInsets = false
         scroll.hasVerticalScroller = true
@@ -318,12 +321,49 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
         let expanded = node.loading ? !node.wantsExpanded : !outline.isItemExpanded(node)
         setExpansion(node, expanded: expanded)
     }
+    func outlineView(_ outlineView: NSOutlineView, pasteboardWriterForItem item: Any) -> NSPasteboardWriting? {
+        guard let node = item as? FolderNode, let url = node.url,
+              (outlineView.parent(forItem: node) as? FolderNode) === roots.first else { return nil }
+        let writer = NSPasteboardItem()
+        writer.setString(url.path, forType: Self.favoriteDragType)
+        return writer
+    }
+    private func favoriteDropIndex(item: Any?, childIndex: Int) -> Int? {
+        guard let group = roots.first, let children = group.children,
+              let node = item as? FolderNode else { return nil }
+        if node === group {
+            return childIndex == NSOutlineViewDropOnItemIndex ? children.count : ((0...children.count).contains(childIndex) ? childIndex : nil)
+        }
+        // Dropping on a favorite means inserting before it, never into its folder.
+        return children.firstIndex { $0 === node }
+    }
+    private func moveFavorite(path: String, to insertionIndex: Int) -> Bool {
+        var paths = favorites.map(\.path)
+        guard (0...paths.count).contains(insertionIndex), let sourceIndex = paths.firstIndex(of: path) else { return false }
+        let destinationIndex = insertionIndex > sourceIndex ? insertionIndex - 1 : insertionIndex
+        guard destinationIndex != sourceIndex else { return true }
+        paths.insert(paths.remove(at: sourceIndex), at: destinationIndex)
+        UserDefaults.standard.set(paths, forKey: "favorites")
+        publishSharedChange()
+        return true
+    }
     func outlineView(_ outlineView: NSOutlineView, validateDrop info: NSDraggingInfo, proposedItem item: Any?, proposedChildIndex index: Int) -> NSDragOperation {
+        if let path = info.draggingPasteboard.string(forType: Self.favoriteDragType) {
+            guard info.draggingSource is FolderOutlineView, favorites.contains(where: { $0.path == path }),
+                  let insertionIndex = favoriteDropIndex(item: item, childIndex: index) else { return [] }
+            outlineView.setDropItem(roots.first, dropChildIndex: insertionIndex)
+            return .move
+        }
         guard let node = item as? FolderNode, node.url != nil else { return [] }
         outlineView.setDropItem(node, dropChildIndex: NSOutlineViewDropOnItemIndex)
         return FileTransfer.dragOperation(info)
     }
     func outlineView(_ outlineView: NSOutlineView, acceptDrop info: NSDraggingInfo, item: Any?, childIndex index: Int) -> Bool {
+        if let path = info.draggingPasteboard.string(forType: Self.favoriteDragType) {
+            guard info.draggingSource is FolderOutlineView,
+                  let insertionIndex = favoriteDropIndex(item: item, childIndex: index) else { return false }
+            return moveFavorite(path: path, to: insertionIndex)
+        }
         guard let node = item as? FolderNode, let destination = node.url else { return false }
         return FileTransfer.accept(info, destination: destination, perform: onDrop)
     }
