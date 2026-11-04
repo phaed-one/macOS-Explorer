@@ -8,10 +8,6 @@
   A Liquid Glass Finder replacement for macOS.
 </p>
 
-<!-- VIRUSTOTAL_BADGE_START -->
-[![VirusTotal release scan](https://badges.cssnr.com/vt/sha/c7a9b88b9f3c07fff2e3ddf1adeaeeda2c7fa343d9c9e22e36639627d2b60e04?label=VirusTotal)](https://www.virustotal.com/gui/file/c7a9b88b9f3c07fff2e3ddf1adeaeeda2c7fa343d9c9e22e36639627d2b60e04)
-<!-- VIRUSTOTAL_BADGE_END -->
-
 ![macOS Explorer](docs/screenshot-2.webp)
 
 Windows File Explorer's editable path bar, full-disk folder tree, combined with Finder's Spotlight search, Trash put-back and native look. Multi-tab and multi-window. Native AppKit with built-in updates. Requires macOS 14; Liquid Glass on macOS 26.
@@ -32,6 +28,13 @@ Windows File Explorer's editable path bar, full-disk folder tree, combined with 
 
 Download the ZIP from the [latest release](https://github.com/phaed-one/macOS-Explorer/releases/latest),
 unzip it, and move **Explorer.app** into **Applications**.
+
+Each release ZIP is scanned with VirusTotal. The badge shows detections across
+the engines that completed the latest release scan; click it for the full report.
+
+<!-- VIRUSTOTAL_BADGE_START -->
+[![VirusTotal release scan: 0 detections / 66 engines](https://img.shields.io/badge/VirusTotal-0%20%2F%2066-brightgreen)](https://www.virustotal.com/gui/file/c7a9b88b9f3c07fff2e3ddf1adeaeeda2c7fa343d9c9e22e36639627d2b60e04)
+<!-- VIRUSTOTAL_BADGE_END -->
 
 ## Using Explorer
 
