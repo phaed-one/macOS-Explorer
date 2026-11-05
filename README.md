@@ -10,8 +10,6 @@
 
 ![macOS Explorer in dark mode](docs/screenshot-dark.webp)
 
-![macOS Explorer in light mode](docs/screenshot-light-2.webp)
-
 ![Explorer Settings over the main window](docs/screenshot-settings.webp)
 
 Windows File Explorer's editable path bar, full-disk folder tree, combined with Finder's Spotlight search, Trash put-back and native look. Multi-tab and multi-window. Native AppKit with built-in updates. Requires macOS 14; Liquid Glass on macOS 26.
