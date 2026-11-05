@@ -17,7 +17,13 @@ func checkMomentaryButtonHighlight() throws {
     button.mouseExited(with: event)
     try require(backgroundAlpha() < 0.01, "Leaving a clicked icon must remove its hover background")
     button.setButtonType(.toggle); button.state = .on
-    try require(backgroundAlpha() > 0.9, "Actual toggles must retain their selected background")
+    let selectedAlpha = backgroundAlpha()
+    if #available(macOS 26, *) {
+        try require(button.bezelStyle == .glass && button.isBordered, "Active toggles must use the native Liquid Glass bezel")
+    } else { try require(selectedAlpha > 0.9, "Actual toggles must retain their selected background") }
+    button.state = .off
+    _ = backgroundAlpha()
+    try require(!button.isBordered, "Inactive icons must return to their unbordered appearance")
     print("PASS: Momentary icon highlights clear after clicks and mouse exit; actual toggles retain selection")
 }
 

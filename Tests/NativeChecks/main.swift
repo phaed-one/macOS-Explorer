@@ -159,7 +159,13 @@ do {
     browser.navigate(URL(fileURLWithPath: "/tmp"))
     try waitUntil { window.representedURL?.path == "/tmp" }
     let originalTab = descendants(surface).compactMap { $0 as? NSButton }.first { $0.accessibilityHelp() == originalFolder.path }!
-    try require(originalTab.superview?.layer?.backgroundColor?.alpha == 0, "Inactive tabs must have transparent backgrounds")
+    if #available(macOS 26, *) {
+        var ancestor = originalTab.superview
+        while ancestor != nil && !(ancestor is NSGlassEffectView) { ancestor = ancestor?.superview }
+        try require((ancestor as? NSGlassEffectView)?.tintColor == .clear, "Inactive tabs must use untinted glass")
+    } else {
+        try require(originalTab.superview?.layer?.backgroundColor?.alpha == 0, "Inactive tabs must have transparent backgrounds")
+    }
     originalTab.performClick(nil)
     try waitUntil { window.representedURL?.path == originalFolder.path }
     print("PASS: Glass forwards tab clicks and native tab buttons switch folders")
@@ -234,8 +240,12 @@ do {
     pressed.isBordered = false; pressed.title = ""; pressed.isHighlighted = true
     let pressedImage = NSImage(size: pressed.bounds.size, flipped: false) { rect in pressed.draw(rect); return true }
     let pressedColor = NSBitmapImageRep(data: pressedImage.tiffRepresentation!)!.colorAt(x: 15, y: 15)!.usingColorSpace(.sRGB)!
-    try require(pressedColor.redComponent > referenceColor.redComponent && pressedColor.blueComponent > referenceColor.blueComponent, "Pressed buttons must draw a lighter Accent fill")
-    print("PASS: Inactive selection rendering uses Accent and pressed buttons use a lighter Accent")
+    if #available(macOS 26, *) {
+        try require(pressed.bezelStyle == .glass && pressed.isBordered, "Pressed toolbar buttons must use the native glass bezel")
+    } else {
+        try require(pressedColor.redComponent > referenceColor.redComponent && pressedColor.blueComponent > referenceColor.blueComponent, "Pressed buttons must draw a lighter Accent fill")
+    }
+    print("PASS: Inactive selection uses Accent; pressed buttons use native glass on macOS 26 with the earlier macOS fallback")
     try require(!window.styleMask.contains(.titled) && window.styleMask.contains(.resizable) && window.canBecomeKey && window.canBecomeMain, "Custom outline must retain key-window eligibility and the resize style")
     try checkWindowResizeInput()
     let outlineToggle = descendants(settings.window!.contentView!).compactMap { $0 as? NSButton }.first { $0.title == "Show window outline" }!

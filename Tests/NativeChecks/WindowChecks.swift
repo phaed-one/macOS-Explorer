@@ -102,7 +102,9 @@ func checkWindowTransfers() throws {
     try Data("tab".utf8).write(to: tabFile)
     let targetButton = descendants(second.window!.contentView!).compactMap { $0 as? NSButton }.first { $0.accessibilityHelp() == b.path }!
     let fileOnTab = TestDrag(); fileOnTab.draggingPasteboard.writeObjects([tabFile as NSURL])
-    try require(targetButton.superview!.performDragOperation(fileOnTab), "A tab title must accept files from another window")
+    var dropTarget: NSView? = targetButton
+    while let view = dropTarget, !view.registeredDraggedTypes.contains(.fileURL) { dropTarget = view.superview }
+    try require(dropTarget?.performDragOperation(fileOnTab) == true, "A tab title must accept files from another window")
     try waitUntil { FileManager.default.fileExists(atPath: b.appendingPathComponent("onto-tab.txt").path) && second.canTransferTabs }
     let before = Set(workspace.browsers.keys)
     workspace.prepareToTerminate()

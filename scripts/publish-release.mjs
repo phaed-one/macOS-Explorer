@@ -47,6 +47,10 @@ const body = `### What’s new
 - **Icon spacing:** A smaller slider beside icon size adjusts the gaps between files and folders.
 - **Reset to Defaults:** Restore appearance settings in one click.
 - **Liquid Glass dialogs:** Settings, file information, permissions, server connections, access setup, and app alerts now share Explorer's glass appearance.
+- Dialog glass extends through the titlebar, and empty dialog backgrounds can be dragged.
+- Pressed and active toolbar icons use native Liquid Glass on macOS 26.
+- Glass styling extends to tabs, path and search fields, navigation and dialog buttons, suggestions, and tooltips. The main toolbar/header background stays unchanged.
+- Refreshed app icon with a glass background and 70% black tint.
 
 - **Connect to Server:** Click the server icon to the right of Favorites on the toolbar (⌘K) to open shared folders from SMB, AFP, NFS, or WebDAV servers. Sign in when asked and browse the share in Explorer.
 - **Full Disk Access setup:** If protected folders are blocked, a setup window appears at launch with a shortcut to System Settings. It closes when access works, with a restart option if needed.

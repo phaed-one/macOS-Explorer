@@ -85,11 +85,12 @@ final class HelpPopup {
         let hint = panel ?? NSPanel(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         hint.level = .popUpMenu; hint.ignoresMouseEvents = true; hint.hidesOnDeactivate = true
         hint.isOpaque = false; hint.backgroundColor = .clear; hint.hasShadow = true
-        let background = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
-        background.material = .popover; background.state = .active
-        background.wantsLayer = true; background.layer?.cornerRadius = 6; background.layer?.masksToBounds = true
-        label.frame = background.bounds.insetBy(dx: 8, dy: 6)
-        background.addSubview(label); hint.contentView = background
+        let body = NSView(frame: NSRect(origin: .zero, size: size))
+        label.frame = body.bounds.insetBy(dx: 8, dy: 6)
+        body.addSubview(label)
+        let background = GlassControls.surface(for: body, cornerRadius: 6)
+        background.frame = body.bounds
+        hint.contentView = background
         let control = window.convertToScreen(view.convert(view.bounds, to: nil))
         let screen = window.screen?.visibleFrame ?? NSScreen.main!.visibleFrame
         let x = max(screen.minX, min(control.midX - size.width / 2, screen.maxX - size.width))

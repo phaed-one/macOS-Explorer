@@ -32,6 +32,25 @@ func checkDialogAppearance() throws {
         let view = try background(window)
         window.contentView!.layoutSubtreeIfNeeded()
         try require(view.frame == window.contentView!.bounds, "Glass must fill the dialog without moving its controls")
+        try require(window.styleMask.contains(.fullSizeContentView) && window.isMovableByWindowBackground,
+            "App dialogs must extend glass through the titlebar and allow background dragging")
+        guard let body = window.contentView?.subviews.last else { throw NativeCheckError.failed("Missing dialog body") }
+        try require(body.frame.maxY <= window.contentLayoutRect.maxY + 1,
+            "Dialog controls must remain below the native titlebar")
+        let root = window.contentView!
+        let blank = root.convert(NSPoint(x: 4, y: window.contentLayoutRect.midY), to: root.superview)
+        try require(root.hitTest(blank) === root && root.mouseDownCanMoveWindow, "Empty dialog space must reach the window-dragging view")
+        for button in descendants(body).compactMap({ $0 as? NSButton }) where !button.isHiddenOrHasHiddenAncestor && button.isEnabled {
+            let center = NSPoint(x: button.bounds.midX, y: button.bounds.midY)
+            guard button.visibleRect.contains(center) else { continue }
+            let point = button.convert(center, to: root.superview)
+            let hit = root.hitTest(point)
+            try require(hit === button || hit?.isDescendant(of: button) == true, "Background drag intercepted \(window.title): \(button.title) / \(button.accessibilityLabel() ?? "") at \(point); hit \(String(describing: hit))")
+        }
+        if #available(macOS 26, *) {
+            let buttons = descendants(body).compactMap { $0 as? NSButton }.filter { $0.isBordered && !($0 is GlassToolbarButton) }
+            try require(buttons.allSatisfy { $0.bezelStyle == .glass }, "Dialog push buttons must use their native glass alternative")
+        }
         DialogAppearance.install(on: window)
         try require(window.contentView!.subviews.filter { $0 is WindowBackdrop }.count == 1, "Repeated presentation must not stack duplicate glass materials")
     }

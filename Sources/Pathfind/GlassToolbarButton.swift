@@ -19,6 +19,14 @@ final class GlassToolbarButton: NSButton {
     override func mouseEntered(with event: NSEvent) { hover = true; needsDisplay = true }
     override func mouseExited(with event: NSEvent) { hover = false; needsDisplay = true }
     override func draw(_ dirtyRect: NSRect) {
+        if #available(macOS 26, *), isEnabled && (isHighlighted || (drawsToggleSelection && state == .on)) {
+            if bezelStyle != .glass { bezelStyle = .glass }
+            if !isBordered { isBordered = true }
+            if bezelColor != BrowserTheme.accentColor { bezelColor = BrowserTheme.accentColor }
+            super.draw(dirtyRect)
+            return
+        }
+        if isBordered { isBordered = false }
         if (hover || isHighlighted || (drawsToggleSelection && state == .on)) && isEnabled {
             let side = min(bounds.width, bounds.height) - 2
             let square = NSRect(x: bounds.midX - side / 2, y: bounds.midY - side / 2, width: side, height: side)

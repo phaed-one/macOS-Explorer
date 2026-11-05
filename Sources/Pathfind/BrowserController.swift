@@ -50,6 +50,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     private let path = HeaderTextField()
     private var pathCompletion: PathCompletionController?
     private let search = HeaderTextField(symbol: "magnifyingglass")
+    private var fieldSurfaces: [NSView] = []
     private let status = NSTextField(labelWithString: "")
     private let hidden = GlassToolbarButton()
     private let folderHidden = GlassToolbarButton()
@@ -194,6 +195,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         search.widthAnchor.constraint(equalToConstant: 280).isActive = true
         let viewControl = NSPopUpButton(frame: .zero, pullsDown: true)
         viewControl.isBordered = false
+        if #available(macOS 26, *) { viewControl.widthAnchor.constraint(equalToConstant: 40).isActive = true }
         ToolbarHelp.install(on: viewControl, text: "Folder view options")
         viewControl.setAccessibilityLabel("View options")
         viewMenu.delegate = self; viewControl.menu = viewMenu
@@ -240,7 +242,13 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         path.setContentHuggingPriority(.defaultLow, for: .horizontal)
         let connect = button("server.rack", "Connect to Server (⌘K)", #selector(connectToServer))
         connect.setAccessibilityLabel("Connect to Server")
-        let navigation = NSStackView(views: [path, search])
+        let pathSurface = GlassControls.fieldSurface(for: path)
+        let searchSurface = GlassControls.fieldSurface(for: search)
+        if searchSurface !== search { searchSurface.widthAnchor.constraint(equalToConstant: 280).isActive = true }
+        pathSurface.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        fieldSurfaces = [pathSurface, searchSurface]
+        let navigation = NSStackView(views: fieldSurfaces)
+        searchSurface.trailingAnchor.constraint(equalTo: navigation.trailingAnchor).isActive = true
         navigation.spacing = 6
         navigation.heightAnchor.constraint(equalToConstant: 52).isActive = true
         let spacer = NSView(); spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -267,7 +275,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             favorite, connect, spacer,
             settings
         ])
-        commands.spacing = 7; commands.heightAnchor.constraint(equalToConstant: 36).isActive = true
+        commands.spacing = 6; commands.heightAnchor.constraint(equalToConstant: 36).isActive = true
         commands.setCustomSpacing(28, after: favorite)
         commands.setCustomSpacing(4, after: iconSlider)
         let top = NSStackView(views: [navigation, commands])
@@ -1026,6 +1034,8 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             windowOutline.needsDisplay = true
             path.backgroundColor = BrowserTheme.field
             search.backgroundColor = BrowserTheme.field
+            fieldSurfaces.forEach(GlassControls.tintFieldSurface)
+            GlassControls.apply(to: root)
             sidebar.outline.backgroundColor = .clear
             table.backgroundColor = .clear
             icons.collection.backgroundColors = [.clear]

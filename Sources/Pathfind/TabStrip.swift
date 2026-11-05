@@ -24,6 +24,9 @@ final class TabStrip: NSView {
         addSubview(scroll)
         plus.target = self; plus.action = #selector(newTab)
         plus.isBordered = false
+        if #available(macOS 26, *) {
+            plus.bezelStyle = .glass; plus.isBordered = true; plus.showsBorderOnlyWhileMouseInside = true
+        }
         ToolbarHelp.install(on: plus, text: "New tab (⌘T)")
         content.addSubview(plus)
         registerForDraggedTypes([TabTransfer.pasteboardType])
@@ -78,11 +81,19 @@ private final class BrowserTabView: NSView, NSDraggingSource {
     private var originalWindowFrame: NSRect?
     private let selected: Bool
     private var dropHighlight = false
+    private var material: NSView?
     init(tab: BrowserTab, selected: Bool) {
         self.selected = selected
         super.init(frame: .zero)
         wantsLayer = true; layer?.cornerRadius = 8
         layer?.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        let controls: NSView
+        if #available(macOS 26, *) {
+            controls = NSView()
+            let glass = GlassControls.surface(for: controls, cornerRadius: 8, clear: true)
+            glass.frame = bounds; glass.autoresizingMask = [.width, .height]
+            addSubview(glass); material = glass
+        } else { controls = self }
         let title = BrowserLocation.title(tab.url)
         let icon = BrowserLocation.icon(tab.url).copy() as! NSImage
         icon.size = NSSize(width: 16, height: 16)
@@ -101,13 +112,21 @@ private final class BrowserTabView: NSView, NSDraggingSource {
         select.setAccessibilityLabel("Tab: \(title)")
         let close = NSButton(image: NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close tab \(title)")!, target: self, action: #selector(closeTab))
         close.isBordered = false
+        if #available(macOS 26, *) {
+            close.bezelStyle = .glass; close.isBordered = true; close.showsBorderOnlyWhileMouseInside = true
+        }
         ToolbarHelp.install(on: close, text: "Close tab (⌘W)")
-        for child in [select, close] { child.translatesAutoresizingMaskIntoConstraints = false; addSubview(child) }
-        NSLayoutConstraint.activate([select.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10), select.topAnchor.constraint(equalTo: topAnchor), select.bottomAnchor.constraint(equalTo: bottomAnchor), select.trailingAnchor.constraint(equalTo: close.leadingAnchor, constant: -6), close.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8), close.centerYAnchor.constraint(equalTo: centerYAnchor), close.widthAnchor.constraint(equalToConstant: 22)])
+        for child in [select, close] { child.translatesAutoresizingMaskIntoConstraints = false; controls.addSubview(child) }
+        NSLayoutConstraint.activate([select.leadingAnchor.constraint(equalTo: controls.leadingAnchor, constant: 10), select.topAnchor.constraint(equalTo: controls.topAnchor), select.bottomAnchor.constraint(equalTo: controls.bottomAnchor), select.trailingAnchor.constraint(equalTo: close.leadingAnchor, constant: -6), close.trailingAnchor.constraint(equalTo: controls.trailingAnchor, constant: -8), close.centerYAnchor.constraint(equalTo: controls.centerYAnchor), close.widthAnchor.constraint(equalToConstant: 22)])
         registerForDraggedTypes([.fileURL, TabTransfer.pasteboardType]); refresh()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     private func refresh() {
+        if #available(macOS 26, *), let glass = material as? NSGlassEffectView {
+            glass.tintColor = dropHighlight ? NSColor.selectedContentBackgroundColor.withAlphaComponent(0.4) : selected ? BrowserTheme.accentColor.withAlphaComponent(0.25) : .clear
+            BrowserTheme.paint(self, color: .clear)
+            return
+        }
         BrowserTheme.paint(self, color: dropHighlight ? .selectedContentBackgroundColor : selected ? BrowserTheme.chrome : .clear)
     }
     override func mouseDown(with event: NSEvent) {

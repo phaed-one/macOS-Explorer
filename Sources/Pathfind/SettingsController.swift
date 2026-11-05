@@ -240,7 +240,7 @@ private final class AnchoredColorWell: NSColorWell {
         super.activate(exclusive)
         guard let owner = window else { return }
         let picker = NSColorPanel.shared
-        DialogAppearance.install(on: picker)
+        DialogAppearance.install(on: picker, fillTitlebar: false)
         let screen = owner.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? owner.frame
         let size = picker.frame.size
         var x = owner.frame.maxX + 10

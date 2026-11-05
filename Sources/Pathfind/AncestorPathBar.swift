@@ -44,6 +44,7 @@ final class AncestorPathBar: NSView {
             return button
         }
         needsLayout = true
+        GlassControls.apply(to: self)
         layoutSubtreeIfNeeded()
         content.scrollToVisible(NSRect(x: max(0, content.bounds.width - 1), y: 0, width: 1, height: bounds.height))
     }

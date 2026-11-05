@@ -27,16 +27,15 @@ final class PathCompletionController: NSObject, NSTextFieldDelegate, NSTableView
         panel.setAccessibilityLabel("Path folder suggestions")
         panel.level = .popUpMenu; panel.hidesOnDeactivate = true
         panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = true
-        let background = NSVisualEffectView()
-        background.material = .popover; background.state = .active
-        background.wantsLayer = true; background.layer?.cornerRadius = 8; background.layer?.masksToBounds = true
+        let body = NSView()
+        let background = GlassControls.surface(for: body, cornerRadius: 8)
         panel.contentView = background
         scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
         scroll.scrollerStyle = .overlay
         scroll.automaticallyAdjustsContentInsets = false
         scroll.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
         scroll.autoresizingMask = [.width, .height]
-        background.addSubview(scroll)
+        body.addSubview(scroll)
         table.addTableColumn(NSTableColumn(identifier: NSUserInterfaceItemIdentifier("folder")))
         table.headerView = nil; table.style = .plain
         table.usesAutomaticRowHeights = false

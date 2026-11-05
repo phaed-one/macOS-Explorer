@@ -23,7 +23,15 @@ func checkServerConnections() throws {
         try require(root.bounds.contains(frame) && frame.size == NSSize(width: 30, height: 30) && toolbarConnect.imagePosition == .imageOnly, "Server connection must use one standard square toolbar icon")
         let path = descendants(root).compactMap { $0 as? NSTextField }.first { $0.accessibilityLabel() == "Current folder path" }!
         let search = descendants(root).compactMap { $0 as? NSTextField }.first { $0.accessibilityLabel() == "Search this folder" }!
-        let searchFrame = search.convert(search.bounds, to: root)
+        var searchSurface: NSView = search
+        if #available(macOS 26, *) {
+            var ancestor = search.superview
+            while let view = ancestor {
+                if view is NSGlassEffectView { searchSurface = view; break }
+                ancestor = view.superview
+            }
+        }
+        let searchFrame = searchSurface.convert(searchSurface.bounds, to: root)
         try require(path.frame.width > 150 && abs(searchFrame.maxX - (root.bounds.maxX - 20)) < 1, "Search must retain its original right-aligned position")
         let favorite = descendants(root).compactMap { $0 as? NSButton }.first { $0.accessibilityLabel() == "Add selected folder to Favorites" }!
         let favoriteFrame = favorite.convert(favorite.bounds, to: root)

@@ -14,15 +14,22 @@ cat <<SVG
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
     <clipPath id="tile"><rect x="100" y="100" width="824" height="824" rx="185"/></clipPath>
+    <mask id="outsideTile"><rect width="1024" height="1024" fill="#fff"/><rect x="100" y="100" width="824" height="824" rx="185" fill="#000"/></mask>
     <clipPath id="back"><path d="M291 300H428Q452 300 467 318L485 340H733Q777 340 777 384V680Q777 724 733 724H291Q247 724 247 680V344Q247 300 291 300Z"/></clipPath>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1b1b24"/>
-      <stop offset="1" stop-color="#030305"/>
+      <stop offset="0" stop-color="#000" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.7"/>
+    </linearGradient>
+    <linearGradient id="glassSheen" x1="0" y1="0" x2="0.75" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.20"/>
+      <stop offset="0.35" stop-color="#fff" stop-opacity="0.035"/>
+      <stop offset="0.7" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0.07"/>
     </linearGradient>
     <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fff" stop-opacity="0.22"/>
+      <stop offset="0" stop-color="#fff" stop-opacity="0.42"/>
       <stop offset="0.5" stop-color="#fff" stop-opacity="0.05"/>
-      <stop offset="1" stop-color="#fff" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0.20"/>
     </linearGradient>
     <linearGradient id="backFill" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#e4e6ee"/>
@@ -44,9 +51,10 @@ cat <<SVG
   </defs>
 
   <!-- tile shadow -->
-  <rect x="100" y="112" width="824" height="824" rx="185" fill="#000" opacity="0.45" filter="url(#drop)"/>
+  <rect x="100" y="112" width="824" height="824" rx="185" fill="#000" opacity="0.45" filter="url(#drop)" mask="url(#outsideTile)"/>
   <!-- tile -->
   <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>${GLOW}
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#glassSheen)"/>
   <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
 
   <!-- folder shadow -->

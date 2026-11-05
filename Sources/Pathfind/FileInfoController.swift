@@ -112,7 +112,7 @@ final class FileInfoController: NSWindowController, NSWindowDelegate {
                       let stack = self.contentStack else { return }
                 self.sizeLabel.stringValue = summary
                 window.contentView?.layoutSubtreeIfNeeded()
-                window.setContentSize(NSSize(width: 500, height: stack.fittingSize.height + 48))
+                DialogAppearance.setBodySize(NSSize(width: 500, height: stack.fittingSize.height + 48), on: window)
             }
         }
     }
