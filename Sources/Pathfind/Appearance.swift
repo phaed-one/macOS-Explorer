@@ -29,7 +29,8 @@ enum GlassStyle: String, CaseIterable {
 enum BrowserTheme {
     /// Every Appearance setting is kept separately for light and dark.
     static let themedKeys = ["frostedPanes", "paneOpacity", "glassTint", "glassTintEnabled", "glassStyle", "titlebarTint",
-                             "titlebarOpacity", "titlebarTintEnabled", "accentColor", "windowOutlineEnabled", "windowOutlineColor"]
+                             "titlebarOpacity", "titlebarTintEnabled", "accentColor", "windowOutlineEnabled", "windowOutlineColor",
+                             "fieldTintEnabled", "fieldTintColor"]
     static let appearancePreferenceKeys = ["appearanceMode", "chromeDarkColor", "chromeLightColor", "glassFrosted", "glassFrosting"]
         + themedKeys + themedKeys.flatMap { ["\($0).dark", "\($0).light"] }
     static func themedKey(_ key: String, dark: Bool = darkMode) -> String { "\(key).\(dark ? "dark" : "light")" }
@@ -100,21 +101,24 @@ enum BrowserTheme {
         if let rgb = themed("titlebarTint") as? [Double], rgb.count == 3 {
             return NSColor(srgbRed: rgb[0], green: rgb[1], blue: rgb[2], alpha: 1)
         }
-        return NSColor(srgbRed: 0.2403, green: 0.2530, blue: 0.3082, alpha: 1)
+        // Dark: a blue-grey titlebar. Light: a neutral grey one.
+        return darkMode ? defaultAccent : NSColor(white: 0.7235, alpha: 1).usingColorSpace(.sRGB)!
     }
+    /// The accent has its own default in both themes, so a pale light titlebar doesn't wash it out.
+    static let defaultAccent = NSColor(srgbRed: 0.2403, green: 0.2530, blue: 0.3082, alpha: 1)
     static var accentColor: NSColor {
         if let rgb = themed("accentColor") as? [Double], rgb.count == 3 {
             return NSColor(srgbRed: rgb[0], green: rgb[1], blue: rgb[2], alpha: 1)
         }
-        return titlebarTint
+        return defaultAccent
     }
     static func initializeAccent() {
         guard themed("accentColor") == nil,
-              let color = titlebarTint.usingColorSpace(.sRGB) else { return }
+              let color = defaultAccent.usingColorSpace(.sRGB) else { return }
         setThemed([Double(color.redComponent), Double(color.greenComponent), Double(color.blueComponent)], forKey: "accentColor")
     }
     static var titlebarOpacity: Double {
-        guard let value = themed("titlebarOpacity") as? Double else { return 0.38 }
+        guard let value = themed("titlebarOpacity") as? Double else { return darkMode ? 0.38 : 0.6 }
         return min(1, max(0, value))
     }
     static var pane: NSColor {
@@ -123,15 +127,16 @@ enum BrowserTheme {
         }
         return shade(dark: 0, light: 1)
     }
-    static var field: NSColor {
-        let accent = accentColor.usingColorSpace(.sRGB) ?? .black
-        return NSColor(name: nil) { appearance in
-            let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            return NSColor(calibratedHue: accent.hueComponent,
-                           saturation: accent.saturationComponent,
-                           brightness: dark ? 0.105 : 0.955, alpha: 1)
+    /// The path and search field color when field tint is on. Light defaults to a light grey.
+    static var fieldTint: NSColor {
+        if let rgb = themed("fieldTintColor") as? [Double], rgb.count == 3 {
+            return NSColor(srgbRed: rgb[0], green: rgb[1], blue: rgb[2], alpha: 1)
         }
+        return darkMode ? NSColor(srgbRed: 0.13, green: 0.14, blue: 0.18, alpha: 1)
+                        : NSColor(white: 0.9248, alpha: 1).usingColorSpace(.sRGB)!
     }
+    /// Off leaves the path and search fields untinted. Light tints them by default; dark doesn't.
+    static var fieldTintEnabled: Bool { themed("fieldTintEnabled") as? Bool ?? !darkMode }
     static var tab: NSColor { shade(dark: 0.12, light: 0.92) }
     static var row: NSColor { frosted ? .clear : pane }
     static func paint(_ view: NSView, color: NSColor) {
@@ -323,7 +328,10 @@ class AccentRowView: NSTableRowView {
         guard selectionHighlightStyle != .none else { return }
         if isEmphasized { super.drawSelection(in: dirtyRect) }
         else {
-            BrowserTheme.accentColor.setFill()
+            // A dark accent would hide dark text in light mode, so lighten it there.
+            let light = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .aqua
+            let accent = BrowserTheme.accentColor
+            (light ? accent.blended(withFraction: 0.72, of: .white) ?? accent : accent).setFill()
             bounds.fill()
         }
     }

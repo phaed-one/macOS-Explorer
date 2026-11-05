@@ -42,19 +42,11 @@ const terminals = [...source.matchAll(/case \.\w+: return "([^"]+)"/g)].map(matc
 if (terminals.length !== 14) throw new Error('Review the terminal catalog before publishing release notes');
 const body = `### What’s new
 
-- **Light and dark themes:** Choose Light or Dark in Settings → Theme. Explorer keeps its own look instead of following macOS.
-- **Per-theme appearance:** Every Appearance setting, and the header color behind the toolbar and selected tab, is saved separately for light and dark.
-- **Glass styles:** Pick Bright glass, Dark glass, Vivid blur, Soft blur or Smoke. Tinting is now optional, with its own switch.
-- **Redesigned Settings:** A wide two-column window with Updates, Theme, Show in Finder and Appearance, all visible without scrolling.
-- **Redesigned dialogs:** Full Disk Access setup puts each step next to its button. Permissions shows owner and group, a live \`rwxr-xr-x\` preview, and chmod input side by side.
-- **Resize from any edge:** Every window edge and corner now resizes Explorer, with the matching cursor.
-- **Drag the window by its tab strip:** Empty space beside the tabs moves the window.
-- **Hide folders from This Mac:** Hide any folder in the tree with the eye icon on the This Mac header. Bring one back from the header's right-click menu, or all of them with the undo icon.
-- **Drag tree folders into Favorites:** Drag a folder from This Mac onto Favorites, or between two favorites.
-- Your home folder is now first in Favorites.
-- The sidebar divider is a light hairline, the line under Favorites is gone, and the window outline is off by default.
-- Path buttons are flat again, and the color picker's glass covers the whole panel.
-- New app icon in dark glass that fits the macOS 26 icon shape.
+- **Reopens exactly as you left it:** Closing the last window and clicking the Dock icon brings that window back with its size, position, tabs, sidebar divider and folder tree. Each tab also remembers its selected items, scroll position and search, after quitting too.
+- **Sidebar keeps its width:** Resizing the window no longer stretches the sidebar.
+- **Field color:** Tint the path and search fields with a color you pick in Settings → Highlights, saved separately for light and dark. The tint now shows while the window is active and follows theme switches.
+- **New light-mode defaults:** Smoke glass, a grey titlebar at 60% and light grey fields.
+- **Readable selection in light mode:** A selection in an inactive pane is now light, so its text stays readable.
 
 ### Updates
 

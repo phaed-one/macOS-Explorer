@@ -34,7 +34,40 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     var onSessionChanged: (() -> Void)?
     var onTabDrop: ((TabTransfer, UUID?) -> Bool)?
     var onDetachTab: ((UUID, NSPoint) -> Void)?
-    var sessionTabs: BrowserTabs { tabs }
+    /// The tabs as they look right now, including the active tab's selection and scroll position.
+    var sessionTabs: BrowserTabs {
+        var saved = tabs
+        saved.current.selection = selection.map(\.url)
+        saved.current.scrollOffset = Double(activeScroll.contentView.bounds.origin.y)
+        return saved
+    }
+    /// Saved selection and scroll waiting for a folder (or its search results) to finish loading.
+    private var pendingRestore: (folder: URL, selection: Set<URL>, scroll: Double?)?
+    private var activeScroll: NSScrollView { isSearching || folderView.mode != .icons ? files : icons.scroll }
+    private func rememberActiveTabState() {
+        guard pendingRestore == nil else { return }
+        tabs.current.selection = selection.map(\.url)
+        tabs.current.scrollOffset = Double(activeScroll.contentView.bounds.origin.y)
+    }
+    private func restoreTabState() {
+        pendingRestore = (current.standardizedFileURL, Set((tabs.current.selection ?? []).map(\.standardizedFileURL)), tabs.current.scrollOffset)
+    }
+    private func applyPendingRestore() {
+        guard let restore = pendingRestore else { return }
+        pendingRestore = nil
+        guard restore.folder == current.standardizedFileURL else { return }
+        let indexes = visible.indices.filter { restore.selection.contains(visible[$0].url.standardizedFileURL) }
+        table.selectRowIndexes(IndexSet(indexes), byExtendingSelection: false)
+        if !isSearching { icons.collection.selectionIndexPaths = Set(indexes.map { IndexPath(item: $0, section: 0) }) }
+        let scroll = activeScroll
+        scroll.layoutSubtreeIfNeeded()
+        if let offset = restore.scroll, let document = scroll.documentView {
+            let maxY = max(0, document.frame.height - scroll.contentView.bounds.height)
+            scroll.contentView.scroll(to: NSPoint(x: 0, y: min(maxY, max(0, offset))))
+            scroll.reflectScrolledClipView(scroll.contentView)
+        }
+        updateStatus()
+    }
     var canTransferTabs: Bool { !busy }
     private let iconSlider = LiveSlider(value: 64, minValue: 32, maxValue: 160, target: nil, action: nil)
     private let spacingSlider = LiveSlider(value: 10, minValue: 0, maxValue: 40, target: nil, action: nil)
@@ -133,6 +166,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             self.releaseInputFocusForHeaderClick(event)
             return event
         }
+        restoreTabState()
         navigate(current, record: false)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -311,6 +345,9 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         installAncestorPathBar()
         sidebarPane.install(sidebar.scroll)
         split.addArrangedSubview(sidebarPane); split.addArrangedSubview(contentPane)
+        // The sidebar keeps its width when the window resizes, so a restored window looks the same.
+        split.setHoldingPriority(.init(260), forSubviewAt: 0)
+        split.setHoldingPriority(.init(250), forSubviewAt: 1)
         status.font = .systemFont(ofSize: 11); status.textColor = .secondaryLabelColor
         for view in [tabStrip, top, split, status] { view.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(view) }
         NSLayoutConstraint.activate([
@@ -405,6 +442,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
                     self.creationButtons.forEach { $0.isEnabled = !self.isTrashBrowsing }
                     self.table.deselectAll(nil)
                     self.applyFilter()
+                    if !self.isSearching { self.applyPendingRestore() }
                     if !urls.isEmpty {
                         let selected = Set(urls.map(\.standardizedFileURL))
                         let indexes = self.visible.indices.filter { selected.contains(self.visible[$0].url.standardizedFileURL) }
@@ -417,6 +455,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
                         self.updateStatus()
                     }
                 case .failure(let error):
+                    self.pendingRestore = nil
                     self.path.stringValue = BrowserLocation.path(self.current)
                     self.updateStatus()
                     self.show(error)
@@ -473,6 +512,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         table.reloadData()
         table.selectRowIndexes(IndexSet(visible.indices.filter { selected.contains(visible[$0].url) }), byExtendingSelection: false)
         updateStatus()
+        if searchState != .gathering { applyPendingRestore() }
     }
     private func updateStatus() {
         let count = visible.count, selected = selection.count
@@ -1035,8 +1075,9 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             titlebarChrome.isHidden = !BrowserTheme.titlebarTintEnabled
             windowOutline.isHidden = !BrowserTheme.outlineEnabled
             windowOutline.needsDisplay = true
-            path.backgroundColor = BrowserTheme.field
-            search.backgroundColor = BrowserTheme.field
+            let fieldColor = BrowserTheme.fieldTintEnabled ? BrowserTheme.fieldTint : BrowserTheme.shade(dark: 0.105, light: 0.955)
+            path.backgroundColor = fieldColor
+            search.backgroundColor = fieldColor
             fieldSurfaces.forEach(GlassControls.tintFieldSurface)
             GlassControls.apply(to: root, excluding: [tabStrip, ancestorPathBar])
             sidebar.outline.backgroundColor = .clear
@@ -1050,14 +1091,17 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     }
     @objc private func newTab() {
         guard !busy else { return }
+        rememberActiveTabState()
         tabs.open(current); activateTab()
     }
     private func selectTab(_ id: UUID) {
         guard !busy, id != tabs.activeID else { return }
+        rememberActiveTabState()
         tabs.select(id); activateTab()
     }
     private func closeTab(_ id: UUID) {
         guard !busy else { return }
+        rememberActiveTabState()
         if !tabs.close(id) { window?.performClose(nil); return }
         activateTab()
     }
@@ -1065,6 +1109,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         request += 1
         entries = []; visible = []; table.reloadData(); icons.reload([])
         onSessionChanged?(); tabStrip.update(tabs)
+        restoreTabState()
         navigate(current, record: false)
     }
     @objc private func closeActiveTab() { closeTab(tabs.activeID) }

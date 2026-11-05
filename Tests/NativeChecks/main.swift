@@ -64,7 +64,7 @@ do {
     try require(abs(BrowserTheme.titlebarTint.usingColorSpace(.sRGB)!.blueComponent - 0.5) < 0.001 && BrowserTheme.titlebarOpacity == 0.4, "Titlebar tint and opacity must persist")
     BrowserTheme.initializeAccent()
     let seededAccent = BrowserTheme.accentColor.usingColorSpace(.sRGB)
-    try require(seededAccent == BrowserTheme.titlebarTint.usingColorSpace(.sRGB), "Accent must start with the current titlebar tint")
+    try require(seededAccent == BrowserTheme.defaultAccent.usingColorSpace(.sRGB), "Accent must start at its own default, not the titlebar tint")
     BrowserTheme.setThemed([0.7, 0.2, 0.1], forKey: "titlebarTint")
     BrowserTheme.initializeAccent()
     try require(BrowserTheme.accentColor.usingColorSpace(.sRGB) == seededAccent, "Changing titlebar tint or restarting must preserve independent Accent")
@@ -207,23 +207,6 @@ do {
     accentWell.sendAction(accentWell.action, to: accentWell.target)
     try require(abs(BrowserTheme.accentColor.usingColorSpace(.sRGB)!.blueComponent - 0.6) < 0.001 && abs(BrowserTheme.titlebarTint.usingColorSpace(.sRGB)!.redComponent - 0.7) < 0.001, "Accent picker must not change titlebar tint")
     print("PASS: Independent Accent settings initialize from titlebar tint and persist separately")
-    let savedAccent = BrowserTheme.themed("accentColor")
-    BrowserTheme.setThemed([0.1, 0.15, 0.2], forKey: "accentColor")
-    let darkField = NSAppearance(named: .darkAqua)!
-    var lowAccentField: NSColor!
-    darkField.performAsCurrentDrawingAppearance { lowAccentField = BrowserTheme.field.usingColorSpace(.sRGB) }
-    BrowserTheme.setThemed([0.5, 0.75, 1.0], forKey: "accentColor")
-    darkField.performAsCurrentDrawingAppearance {
-        let highAccentField = BrowserTheme.field.usingColorSpace(.sRGB)!
-        try! require(abs(lowAccentField.redComponent - highAccentField.redComponent) < 0.001 && abs(lowAccentField.blueComponent - highAccentField.blueComponent) < 0.001 && highAccentField.blueComponent > highAccentField.redComponent, "Field tint must use Accent hue without inheriting its brightness")
-    }
-    for (name, brightness) in [(NSAppearance.Name.darkAqua, CGFloat(0.105)), (.aqua, CGFloat(0.955))] {
-        var field: NSColor!
-        NSAppearance(named: name)!.performAsCurrentDrawingAppearance { field = BrowserTheme.field.usingColorSpace(.genericRGB) }
-        try require(abs(field.saturationComponent - 0.5) < 0.001 && abs(field.brightnessComponent - brightness) < 0.001, "Path/search must inherit full Accent saturation while preserving dark/light brightness")
-    }
-    if let savedAccent { BrowserTheme.setThemed(savedAccent, forKey: "accentColor") } else { BrowserTheme.setThemed(nil, forKey: "accentColor") }
-    print("PASS: Path/search fields use Accent hue and saturation at their existing dark/light brightness")
     let glassStyle = descendants(settings.window!.contentView!).compactMap { $0 as? NSPopUpButton }.first { $0.accessibilityLabel() == "Glass style" }!
     try require(glassStyle.itemTitles == GlassStyle.allCases.map(\.title), "Settings must offer every glass style: \(glassStyle.itemTitles)")
     let opacityBeforeStyle = BrowserTheme.opacity
@@ -364,6 +347,7 @@ do {
     try checkSettingsReset()
     try checkThemeMode()
     try checkDialogAppearance()
+    try checkWindowReopenRestoresState()
     try checkBrowserEdgeResizing()
     let volume = URL(fileURLWithPath: "/Volumes/Pathfind-QA")
     if FileManager.default.fileExists(atPath: volume.appendingPathComponent("FOLDER1").path) {

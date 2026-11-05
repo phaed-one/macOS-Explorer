@@ -4,6 +4,9 @@ public struct BrowserTab: Codable {
     public let id: UUID
     public var url: URL
     public var history: NavigationHistory
+    /// What the tab showed when it was last left, so reopening looks the same. Older sessions lack these.
+    public var selection: [URL]?
+    public var scrollOffset: Double?
     public init(url: URL) {
         id = UUID(); self.url = url; history = NavigationHistory(); history.visit(url)
     }

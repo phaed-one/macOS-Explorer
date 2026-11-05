@@ -40,6 +40,15 @@ final class BrowserWorkspace: NSObject, NSWindowDelegate {
         }
         restoring = false; save()
     }
+    /// Clicking the Dock icon with no windows brings back the last closed one exactly as it was.
+    @discardableResult func reopenLastClosed() -> BrowserController {
+        guard let saved = lastClosed, !saved.tabs.items.isEmpty else { return newWindow() }
+        lastClosed = nil
+        let browser = create(tabs: saved.tabs, id: saved.id)
+        if let window = browser.window { place(window, frame: NSRectFromString(saved.frame)) }
+        save()
+        return browser
+    }
     @discardableResult func newWindow(at url: URL? = nil) -> BrowserController {
         create(tabs: BrowserTabs(url: url ?? FileManager.default.homeDirectoryForCurrentUser))
     }

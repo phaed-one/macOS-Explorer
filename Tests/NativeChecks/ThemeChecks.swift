@@ -3,7 +3,7 @@ import PathfindCore
 
 func checkThemeMode() throws {
     let defaults = UserDefaults.standard
-    let keys = ["appearanceMode", "chromeDarkColor", "chromeLightColor"]
+    let keys = ["appearanceMode", "chromeDarkColor", "chromeLightColor", "fieldTintEnabled.dark", "fieldTintEnabled.light", "fieldTintColor.dark", "fieldTintColor.light"]
     let saved = keys.map { defaults.object(forKey: $0) }
     let savedAppearance = NSApp.appearance
     defer {
@@ -46,7 +46,59 @@ func checkThemeMode() throws {
     reset.performClick(nil)
     try require(rgb(BrowserTheme.chromeColor(dark: false)) == [255, 255, 255] && rgb(BrowserTheme.chromeColor(dark: true)) == [26, 51, 77],
         "Reset must only restore the showing mode's header color")
+    // Field tint: on in light, off in dark, and it follows a live theme switch.
+    if #available(macOS 26, *) {
+        let path = descendants(browser.window!.contentView!).compactMap { $0 as? NSTextField }.first { $0.accessibilityLabel() == "Current folder path" }!
+        var view: NSView? = path.superview
+        while let current = view, !(current is TextInputGlassSurface) { view = current.superview }
+        let glass = view as! TextInputGlassSurface
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        let lightTint = glass.fill?.usingColorSpace(.sRGB)
+        try require(BrowserTheme.fieldTintEnabled && lightTint.map(rgb) == [236, 236, 236] && glass.tintColor == nil,
+            "Light fields default to a light grey, painted under the text: \(String(describing: lightTint.map(rgb)))")
+        let fieldTint = controls.compactMap { $0 as? NSButton }.first { $0.title == "Tint path and search fields" }!
+        let well = controls.compactMap { $0 as? NSColorWell }.first { $0.accessibilityLabel() == "Field color" }!
+        try require(fieldTint.state == .on && well.isEnabled && rgb(well.color) == [236, 236, 236], "The field controls must show the light default")
+        well.color = NSColor(srgbRed: 1, green: 0.9, blue: 0.8, alpha: 1); well.sendAction(well.action, to: well.target)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        try require(glass.fill.flatMap { $0.usingColorSpace(.sRGB) }.map(rgb) == [255, 230, 204], "Picking a field color must repaint the fields")
+        fieldTint.performClick(nil)
+        try require(!BrowserTheme.fieldTintEnabled && glass.fill == nil && !well.isEnabled, "Turning the field tint off must leave plain glass")
+        fieldTint.performClick(nil)
+        select(1)
+        try require(!BrowserTheme.fieldTintEnabled && glass.fill == nil && fieldTint.state == .off, "The field tint is saved per theme, so dark starts untinted")
+        fieldTint.performClick(nil)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        let darkTint = glass.fill?.usingColorSpace(.sRGB)
+        try require(darkTint != nil && darkTint!.brightnessComponent < 0.3, "A dark-mode field tint must be dark after switching live: \(String(describing: darkTint))")
+        select(0)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        try require(glass.fill.flatMap { $0.usingColorSpace(.sRGB) }.map(rgb) == [255, 230, 204], "Switching back to light must restore light's own field color")
+    }
+    // Inactive selection stays readable in light mode.
+    let row = AccentRowView(frame: NSRect(x: 0, y: 0, width: 40, height: 24))
+    row.isSelected = true; row.isEmphasized = false; row.selectionHighlightStyle = .regular
+    func selectionColor(_ name: NSAppearance.Name) -> NSColor {
+        row.appearance = NSAppearance(named: name)
+        var color: NSColor!
+        row.effectiveAppearance.performAsCurrentDrawingAppearance {
+            let image = NSImage(size: row.bounds.size, flipped: false) { rect in row.drawSelection(in: rect); return true }
+            color = NSBitmapImageRep(data: image.tiffRepresentation!)!.colorAt(x: 20, y: 12)!.usingColorSpace(.sRGB)!
+        }
+        return color
+    }
+    try require(selectionColor(.aqua).brightnessComponent > selectionColor(.darkAqua).brightnessComponent + 0.3,
+        "Light mode must lighten the inactive selection so dark text stays readable")
+    // Light mode's own defaults: a grey titlebar at 60%, the blue-grey accent, and grey fields.
+    BrowserTheme.appearancePreferenceKeys.filter { $0.hasSuffix(".light") }.forEach(defaults.removeObject(forKey:))
+    BrowserTheme.themedKeys.forEach(defaults.removeObject(forKey:))
+    select(0)
+    try require(rgb(BrowserTheme.titlebarTint) == [184, 184, 184] && BrowserTheme.titlebarOpacity == 0.6 && rgb(BrowserTheme.accentColor) == [61, 65, 79]
+        && BrowserTheme.glassStyle == .smoke && !BrowserTheme.glassTintEnabled && BrowserTheme.fieldTintEnabled && rgb(BrowserTheme.fieldTint) == [236, 236, 236]
+        && !BrowserTheme.outlineEnabled,
+        "Light must default to a grey titlebar at 60%, blue-grey accent, untinted Smoke glass, light grey fields and no outline")
     BrowserTheme.resetAppearance()
     try require(BrowserTheme.darkMode && NSApp.appearance?.name == .darkAqua, "Reset to Defaults must return to dark")
-    print("PASS: Theme switches Explorer between its own light and dark looks, each with its own header color, repainting tabs live")
+    try require(BrowserTheme.titlebarOpacity == 0.38 && BrowserTheme.glassStyle == .soft, "Dark keeps its own defaults")
+    print("PASS: Theme switches Explorer between its own light and dark looks, each with its own header color, field tint and readable inactive selection")
 }

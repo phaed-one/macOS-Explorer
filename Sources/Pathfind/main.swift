@@ -98,7 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SettingsPresenting, Se
         return menu
     }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if workspace.browsers.isEmpty { workspace.newWindow() }
+        if workspace.browsers.isEmpty { workspace.reopenLastClosed() }
         return true
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

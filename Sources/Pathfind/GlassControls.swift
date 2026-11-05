@@ -36,21 +36,33 @@ enum GlassControls {
         tintFieldSurface(surface)
         return surface
     }
+    /// macOS drops a glass tint while the window is active, so the color is painted under the text instead.
     static func tintFieldSurface(_ surface: NSView) {
-        if #available(macOS 26, *), let glass = surface as? NSGlassEffectView {
-            glass.tintColor = BrowserTheme.field.withAlphaComponent(0.4)
+        if #available(macOS 26, *), let surface = surface as? TextInputGlassSurface {
+            surface.tintColor = nil
+            surface.fill = BrowserTheme.fieldTintEnabled ? BrowserTheme.fieldTint.withAlphaComponent(0.9) : nil
         }
     }
 }
 
 @available(macOS 26, *)
-private final class TextInputGlassSurface: NSGlassEffectView {
+final class TextInputGlassSurface: NSGlassEffectView {
     private weak var field: NSTextField?
     private var cursorArea: NSTrackingArea?
+    private let backing = NSView()
+    /// The color painted behind the text, or nil for plain glass.
+    var fill: NSColor? { didSet { backing.layer?.backgroundColor = fill?.cgColor } }
     init(field: NSTextField) {
         self.field = field
         super.init(frame: field.bounds)
-        style = .clear; cornerRadius = 10; contentView = field
+        style = .clear; cornerRadius = 10
+        backing.wantsLayer = true
+        backing.layer?.cornerRadius = 10; backing.layer?.cornerCurve = .continuous
+        field.translatesAutoresizingMaskIntoConstraints = false
+        backing.addSubview(field)
+        NSLayoutConstraint.activate([field.leadingAnchor.constraint(equalTo: backing.leadingAnchor), field.trailingAnchor.constraint(equalTo: backing.trailingAnchor),
+                                     field.centerYAnchor.constraint(equalTo: backing.centerYAnchor)])
+        contentView = backing
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     override func resetCursorRects() {

@@ -24,6 +24,8 @@ final class SettingsController: NSWindowController {
     private let resetTintButton = NSButton(title: "Reset", target: nil, action: nil)
     private let tintLabel = SettingsController.rowLabel("Tint")
     private let enableOutline = NSButton(checkboxWithTitle: "Show window outline", target: nil, action: nil)
+    private let enableFieldTint = NSButton(checkboxWithTitle: "Tint path and search fields", target: nil, action: nil)
+    private let fieldTintColor = AnchoredColorWell()
     private let opacityLabel = SettingsController.rowLabel("Opacity")
     private let glassStyleLabel = SettingsController.rowLabel("Style")
     private let titlebarColorLabel = SettingsController.rowLabel("Color")
@@ -92,13 +94,16 @@ final class SettingsController: NSWindowController {
         accentColor.setAccessibilityLabel("Accent color")
         let matchTitlebar = NSButton(title: "Match Titlebar", target: self, action: #selector(useTitlebarAccent))
         enableOutline.target = self; enableOutline.action = #selector(toggleOutline(_:))
+        enableFieldTint.target = self; enableFieldTint.action = #selector(toggleFieldTint(_:))
+        fieldTintColor.target = self; fieldTintColor.action = #selector(fieldTintColorChanged)
+        fieldTintColor.setAccessibilityLabel("Field color")
         outlineColor.target = self; outlineColor.action = #selector(outlineColorChanged)
         outlineColor.setAccessibilityLabel("Window outline color")
         for slider in [opacity, titlebarOpacity] {
             slider.isContinuous = true
             slider.widthAnchor.constraint(equalToConstant: 230).isActive = true
         }
-        for well in [tintColor, titlebarColor, accentColor, outlineColor] {
+        for well in [tintColor, titlebarColor, accentColor, outlineColor, fieldTintColor] {
             well.widthAnchor.constraint(equalToConstant: 44).isActive = true
             well.heightAnchor.constraint(equalToConstant: 24).isActive = true
         }
@@ -123,6 +128,7 @@ final class SettingsController: NSWindowController {
             [Self.groupHeader("Highlights"), empty],
             [Self.rowLabel("Accent"), Self.row(accentColor, matchTitlebar)],
             [empty, accentHint],
+            [Self.rowLabel("Fields"), Self.row(enableFieldTint, fieldTintColor)],
             [Self.rowLabel("Outline"), Self.row(enableOutline, outlineColor)],
         ])
         grid.rowSpacing = 10; grid.columnSpacing = 12
@@ -179,7 +185,7 @@ final class SettingsController: NSWindowController {
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     @objc private func resetToDefaults() {
-        for well in [tintColor, titlebarColor, accentColor, outlineColor, chromeColor] { well.deactivate() }
+        for well in [tintColor, titlebarColor, accentColor, outlineColor, chromeColor, fieldTintColor] { well.deactivate() }
         NSColorPanel.shared.orderOut(nil)
         BrowserTheme.resetAppearance()
         syncAppearanceControls()
@@ -199,6 +205,8 @@ final class SettingsController: NSWindowController {
         titlebarPercentage.stringValue = "\(Int(BrowserTheme.titlebarOpacity * 100))%"
         accentColor.color = BrowserTheme.accentColor
         enableOutline.state = BrowserTheme.outlineEnabled ? .on : .off
+        enableFieldTint.state = BrowserTheme.fieldTintEnabled ? .on : .off
+        fieldTintColor.color = BrowserTheme.fieldTint
         outlineColor.color = BrowserTheme.outlineColor
         updateEnabledStates()
     }
@@ -212,6 +220,7 @@ final class SettingsController: NSWindowController {
         for control in [tintColor, resetTintButton] as [NSControl] { control.isEnabled = tintColorOn }
         for control in [titlebarColor, titlebarOpacity, resetTitlebarButton] as [NSControl] { control.isEnabled = titlebarOn }
         outlineColor.isEnabled = BrowserTheme.outlineEnabled
+        fieldTintColor.isEnabled = BrowserTheme.fieldTintEnabled
         glassStyleLabel.textColor = glassOn ? .labelColor : .disabledControlTextColor
         for label in [opacityLabel, percentage] { label.textColor = opacityOn ? .labelColor : .disabledControlTextColor }
         tintLabel.textColor = tintColorOn ? .labelColor : .disabledControlTextColor
@@ -297,6 +306,16 @@ final class SettingsController: NSWindowController {
     @objc private func useTitlebarAccent() {
         accentColor.color = BrowserTheme.titlebarTint
         accentChanged()
+    }
+    @objc private func toggleFieldTint(_ sender: NSButton) {
+        BrowserTheme.setThemed(sender.state == .on, forKey: "fieldTintEnabled")
+        updateEnabledStates()
+        NotificationCenter.default.post(name: BrowserTheme.changed, object: nil)
+    }
+    @objc private func fieldTintColorChanged() {
+        guard let color = fieldTintColor.color.usingColorSpace(.sRGB) else { return }
+        BrowserTheme.setThemed([Double(color.redComponent), Double(color.greenComponent), Double(color.blueComponent)], forKey: "fieldTintColor")
+        NotificationCenter.default.post(name: BrowserTheme.changed, object: nil)
     }
     @objc private func themeModeChanged() {
         UserDefaults.standard.set(themeMode.selectedSegment == 1 ? "dark" : "light", forKey: "appearanceMode")
