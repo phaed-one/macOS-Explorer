@@ -845,7 +845,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
                 alert.showsSuppressionButton = true
                 alert.suppressionButton?.title = "Apply to All"
             }
-            alert.beginSheetModal(for: window) { response in
+            alert.beginGlassSheetModal(for: window) { response in
                 let button = response.rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
                 let choice: NameConflict?
                 switch alert.buttons.indices.contains(button) ? alert.buttons[button].title : "Stop" {
@@ -914,7 +914,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         alert.messageText = "Move \(urls.count) item\(urls.count == 1 ? "" : "s") to the Trash?"
         alert.informativeText = "You can restore these items from the Trash."
         alert.addButton(withTitle: "Move to Trash"); alert.addButton(withTitle: "Cancel")
-        alert.beginSheetModal(for: window) { response in
+        alert.beginGlassSheetModal(for: window) { response in
             guard response == .alertFirstButtonReturn else { return }
             self.performFileOperation { for url in urls { try self.trashStore.trash(url) } }
         }
@@ -925,7 +925,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         let input = NSTextField(string: value); input.frame = NSRect(x: 0, y: 0, width: 320, height: 24)
         alert.accessoryView = input; alert.addButton(withTitle: "Save"); alert.addButton(withTitle: "Cancel")
         alert.window.initialFirstResponder = input
-        alert.beginSheetModal(for: window) { response in
+        alert.beginGlassSheetModal(for: window) { response in
             guard response == .alertFirstButtonReturn else { return }
             let name = input.stringValue
             guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains("\0") else {
@@ -957,7 +957,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         if detail.domain == NSCocoaErrorDomain && [NSFileReadNoPermissionError, NSFileWriteNoPermissionError].contains(detail.code) {
             alert.informativeText += "\n\nFor protected folders, macOS may require Explorer to have Full Disk Access in System Settings → Privacy & Security."
         }
-        alert.beginSheetModal(for: window)
+        alert.beginGlassSheetModal(for: window)
     }
     func releaseInputFocusForHeaderClick(_ event: NSEvent) {
         guard let window, let editor = window.firstResponder as? NSTextView, editor.isFieldEditor else { return }
@@ -1026,7 +1026,6 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             windowOutline.needsDisplay = true
             path.backgroundColor = BrowserTheme.field
             search.backgroundColor = BrowserTheme.field
-            backdrop.refresh()
             sidebar.outline.backgroundColor = .clear
             table.backgroundColor = .clear
             icons.collection.backgroundColors = [.clear]

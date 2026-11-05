@@ -334,6 +334,7 @@ do {
     try checkMomentaryButtonHighlight()
     try checkHalfThicknessScrollbars()
     try checkSettingsReset()
+    try checkDialogAppearance()
     let volume = URL(fileURLWithPath: "/Volumes/Pathfind-QA")
     if FileManager.default.fileExists(atPath: volume.appendingPathComponent("FOLDER1").path) {
         defaults.set([], forKey: "explicitExpandedTreePaths")

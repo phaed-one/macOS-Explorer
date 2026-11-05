@@ -40,6 +40,7 @@ final class ServerConnectionController: NSWindowController, NSWindowDelegate {
             address.widthAnchor.constraint(equalTo: stack.widthAnchor), message.widthAnchor.constraint(equalTo: stack.widthAnchor)])
         content.layoutSubtreeIfNeeded()
         panel.setContentSize(NSSize(width: 500, height: stack.fittingSize.height + 48)); panel.center()
+        DialogAppearance.install(on: panel)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     deinit { cancelMount?() }

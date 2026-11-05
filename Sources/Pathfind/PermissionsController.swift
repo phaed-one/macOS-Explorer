@@ -59,6 +59,7 @@ final class PermissionsController: NSWindowController, NSTextFieldDelegate {
         window.contentView?.layoutSubtreeIfNeeded()
         window.setContentSize(NSSize(width: 490, height: stack.fittingSize.height + 44))
         updateCheckboxes(); input.stringValue = String(format: "%04o", mode)
+        DialogAppearance.install(on: window)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     func present(on parent: NSWindow) { parent.beginSheet(window!) }

@@ -37,7 +37,7 @@ final class TrashActions {
         alert.informativeText = "All items in the Trash on connected drives will be permanently deleted. This cannot be undone."
         alert.addButton(withTitle: "Cancel")
         alert.addButton(withTitle: "Clear Trash")
-        alert.beginSheetModal(for: window) { response in
+        alert.beginGlassSheetModal(for: window) { response in
             if response == .alertSecondButtonReturn { perform { try self.store.clear() } }
         }
     }

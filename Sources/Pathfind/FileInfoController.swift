@@ -13,7 +13,7 @@ final class FileInfoPresenter {
             controller.showWindow(nil)
         } catch {
             let alert = NSAlert(error: error)
-            if let parent { alert.beginSheetModal(for: parent) } else { alert.runModal() }
+            if let parent { alert.beginGlassSheetModal(for: parent) } else { alert.runGlassModal() }
         }
     }
 }
@@ -22,6 +22,7 @@ final class FileInfoController: NSWindowController, NSWindowDelegate {
     var onClose: (() -> Void)?
     private let sizeLabel = NSTextField(wrappingLabelWithString: "")
     private let calculation = Progress(totalUnitCount: 0)
+    private var contentStack: NSStackView?
 
     init(url: URL) throws {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
@@ -61,6 +62,7 @@ final class FileInfoController: NSWindowController, NSWindowDelegate {
         grid.column(at: 1).width = 350
         grid.yPlacement = .top
         let stack = NSStackView(views: [heading, grid])
+        contentStack = stack
         stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 24
         stack.translatesAutoresizingMaskIntoConstraints = false
         window.contentView!.addSubview(stack)
@@ -73,6 +75,7 @@ final class FileInfoController: NSWindowController, NSWindowDelegate {
         window.contentView!.layoutSubtreeIfNeeded()
         window.setContentSize(NSSize(width: 500, height: stack.fittingSize.height + 48))
         window.center()
+        DialogAppearance.install(on: window)
         if type == .typeDirectory { calculateFolderSize(url) }
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -106,7 +109,7 @@ final class FileInfoController: NSWindowController, NSWindowDelegate {
             let summary = (partial ? "At least " : "") + Self.formatSize(bytes) + " · \(count.formatted()) items" + (partial ? " (some items inaccessible)" : "")
             DispatchQueue.main.async {
                 guard let self, let window = self.window,
-                      let stack = window.contentView?.subviews.first as? NSStackView else { return }
+                      let stack = self.contentStack else { return }
                 self.sizeLabel.stringValue = summary
                 window.contentView?.layoutSubtreeIfNeeded()
                 window.setContentSize(NSSize(width: 500, height: stack.fittingSize.height + 48))

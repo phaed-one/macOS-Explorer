@@ -74,6 +74,7 @@ final class DiskAccessController: NSWindowController, NSWindowDelegate {
         content.layoutSubtreeIfNeeded()
         panel.setContentSize(NSSize(width: 550, height: stack.fittingSize.height + 48))
         panel.center()
+        DialogAppearance.install(on: panel)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     deinit { timer?.invalidate(); NotificationCenter.default.removeObserver(self) }

@@ -25,7 +25,7 @@ Windows File Explorer's editable path bar, full-disk folder tree, combined with 
 - Connect to network servers and browse shared folders.
 - Search that covers the current folder and its subfolders by default, using the Spotlight index.
 - A permissions editor that takes octal (`755`) or chmod-style strings (`u+x,go-w`).
-- Liquid Glass window on macOS 26, with opacity, frosting and tint settings, plus custom titlebar tint, accent color and window outline.
+- Liquid Glass windows and dialogs on macOS 26, with opacity, frosting and tint settings, plus custom titlebar tint, accent color and window outline.
 
 ## Install
 

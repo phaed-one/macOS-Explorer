@@ -108,6 +108,7 @@ final class WindowBackdrop: NSView {
         tint.frame = contentView.bounds; tint.autoresizingMask = [.width, .height]
         addSubview(tint)
         foreground = [tint]
+        NotificationCenter.default.addObserver(self, selector: #selector(refresh), name: BrowserTheme.changed, object: nil)
         refresh()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -144,7 +145,7 @@ final class WindowBackdrop: NSView {
         addSubview(view)
         needsLayout = true
     }
-    func refresh() {
+    @objc func refresh() {
         let opacity = BrowserTheme.frosted ? BrowserTheme.opacity : 1
         let useGlass = opacity > 0 && opacity < 1
         // Keep layout and input outside the material's managed content hierarchy.
@@ -159,6 +160,7 @@ final class WindowBackdrop: NSView {
         needsDisplay = true
     }
     override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); refresh() }
+    deinit { NotificationCenter.default.removeObserver(self) }
 }
 
 /// A transparent viewport; the window supplies the single material behind it.

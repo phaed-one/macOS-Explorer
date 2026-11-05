@@ -111,8 +111,8 @@ final class TerminalLauncher: NSObject {
     func open(_ folder: URL, in terminal: TerminalApp, relativeTo window: NSWindow?) {
         func show(_ error: Error) {
             let alert = NSAlert(error: error)
-            if let window { alert.beginSheetModal(for: window) }
-            else { alert.runModal() }
+            if let window { alert.beginGlassSheetModal(for: window) }
+            else { alert.runGlassModal() }
         }
         guard folder.isFileURL, (try? folder.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
             show(NSError(domain: NSCocoaErrorDomain, code: NSFileReadNoSuchFileError,

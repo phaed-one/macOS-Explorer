@@ -116,6 +116,7 @@ final class SettingsController: NSWindowController {
         document.setFrameSize(NSSize(width: document.frame.width, height: max(scroll.contentSize.height, stack.fittingSize.height + 48)))
         window.center()
         syncAppearanceControls()
+        DialogAppearance.install(on: window)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     @objc private func resetToDefaults() {
@@ -147,11 +148,11 @@ final class SettingsController: NSWindowController {
     }
     @objc private func useDefaultManager() {
         do { try DefaultFileManager.useExplorer(); updateDefaultManagerStatus() }
-        catch { NSAlert(error: error).runModal() }
+        catch { NSAlert(error: error).runGlassModal() }
     }
     @objc private func restoreFinder() {
         do { try DefaultFileManager.restoreFinder(); updateDefaultManagerStatus() }
-        catch { NSAlert(error: error).runModal() }
+        catch { NSAlert(error: error).runGlassModal() }
     }
     @objc private func toggleGlass(_ sender: NSButton) {
         UserDefaults.standard.set(sender.state == .on, forKey: "frostedPanes")
@@ -239,6 +240,7 @@ private final class AnchoredColorWell: NSColorWell {
         super.activate(exclusive)
         guard let owner = window else { return }
         let picker = NSColorPanel.shared
+        DialogAppearance.install(on: picker)
         let screen = owner.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? owner.frame
         let size = picker.frame.size
         var x = owner.frame.maxX + 10
