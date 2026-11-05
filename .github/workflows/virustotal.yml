@@ -15,7 +15,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: virustotal-${{ github.event.release.id || inputs.tag || 'latest' }}
+  group: virustotal-release-scan
   cancel-in-progress: false
 
 jobs:
@@ -78,7 +78,7 @@ jobs:
           file_globs: ${{ steps.release.outputs.file }}
           release_id: ${{ steps.release.outputs.id }}
           sha256: 'true'
-          update_release: 'true'
+          update_release: 'false'
           release_heading: '### VirusTotal scan'
           rate_limit: '4'
 
@@ -103,6 +103,10 @@ jobs:
                 headers: {'x-apikey': process.env.VT_API_KEY}
               });
               if (response.status === 429) { await pause(60000); continue; }
+              if (response.status === 404) {
+                core.info('VirusTotal has not made the submitted analysis available yet; waiting');
+                continue;
+              }
               if (!response.ok) throw new Error(`VirusTotal analysis lookup failed: HTTP ${response.status}`);
               const data = await response.json();
               if (data.data.attributes.status === 'completed') {
@@ -113,6 +117,10 @@ jobs:
             if (!completed) throw new Error('VirusTotal analysis is still pending; README badge was not changed');
             const report = `https://www.virustotal.com/gui/file/${process.env.RELEASE_SHA256}`;
             const scannedRelease = (await github.rest.repos.getRelease({...context.repo, release_id: Number(process.env.RELEASE_ID)})).data;
+            if (!scannedRelease.assets.some(asset => asset.digest === `sha256:${process.env.RELEASE_SHA256}`)) {
+              core.info('The release ZIP was replaced while scanning; leaving its reports unchanged');
+              return;
+            }
             if (!(scannedRelease.body || '').includes(report)) {
               const heading = (scannedRelease.body || '').includes('### VirusTotal scan') ? '' : '\n\n### VirusTotal scan';
               await github.rest.repos.updateRelease({...context.repo, release_id: scannedRelease.id,
