@@ -51,6 +51,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SettingsPresenting, Se
         app.activate(ignoringOtherApps: true)
     }
     func applicationDidFinishLaunching(_ notification: Notification) {
+        BrowserTheme.migrateToThemedAppearance()
+        BrowserTheme.applyAppearanceMode()
         let menu = NSMenu()
         let appItem = NSMenuItem()
         menu.addItem(appItem)

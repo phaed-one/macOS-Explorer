@@ -70,6 +70,11 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
     private let statePrefix: String
     private static let sharedChanged = Notification.Name("PathfindSidebarSharedChanged")
     private static let favoriteDragType = NSPasteboard.PasteboardType("com.pathfind.favorite")
+    /// A folder dragged out of THIS MAC. It can only be dropped into Favorites, so dragging
+    /// a whole drive can never start copying it.
+    private static let treeFolderDragType = NSPasteboard.PasteboardType("com.pathfind.tree-folder")
+    private weak var hideButton: NSButton?
+    private weak var unhideAllButton: NSButton?
     private var rebuilding = false
     private var restoringSelection = false
     private var needsSelectionRestore = true
@@ -88,12 +93,14 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
         outline.rowHeight = 27
         outline.indentationPerLevel = 15
         outline.style = .plain
+        // A floating top header draws a separator line under FAVORITES.
+        outline.floatsGroupRows = false
         outline.delegate = self; outline.dataSource = self
         outline.target = self; outline.action = #selector(selected)
         outline.doubleAction = #selector(toggleClickedFolder)
         outline.onToggle = { [weak self] node, expanded in self?.setExpansion(node, expanded: expanded) }
         outline.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
-        outline.registerForDraggedTypes([.fileURL, Self.favoriteDragType])
+        outline.registerForDraggedTypes([.fileURL, Self.favoriteDragType, Self.treeFolderDragType])
         outline.setDraggingSourceOperationMask(.move, forLocal: true)
         outline.setDraggingSourceOperationMask([], forLocal: false)
         scroll.documentView = outline
@@ -118,21 +125,20 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
             return paths.map { URL(fileURLWithPath: $0) }
         }
         let home = FileManager.default.homeDirectoryForCurrentUser
-        return [URL(fileURLWithPath: "/Applications")] + ["Desktop", "Documents", "Downloads"].map { home.appendingPathComponent($0) } + [home]
+        return [home, URL(fileURLWithPath: "/Applications")] + ["Desktop", "Documents", "Downloads"].map { home.appendingPathComponent($0) }
     }
+    /// Once per install, move the home folder to the top of saved favorites; later manual order is kept.
     private func migrateFavoriteOrder() {
         let defaults = UserDefaults.standard
-        guard !defaults.bool(forKey: "applicationsFirstFavoriteOrderApplied") else { return }
+        guard !defaults.bool(forKey: "homeFirstFavoriteOrderApplied") else { return }
         if let paths = defaults.stringArray(forKey: "favorites") {
             let home = FileManager.default.homeDirectoryForCurrentUser.path
-            let middle = paths.filter { $0 != "/Applications" && $0 != home }
-            let ordered = (paths.contains("/Applications") ? ["/Applications"] : [])
-                + middle + (paths.contains(home) ? [home] : [])
-            defaults.set(ordered, forKey: "favorites")
+            if paths.contains(home) { defaults.set([home] + paths.filter { $0 != home }, forKey: "favorites") }
         }
-        defaults.set(true, forKey: "applicationsFirstFavoriteOrderApplied")
+        defaults.set(true, forKey: "homeFirstFavoriteOrderApplied")
     }
-    private var hiddenVolumePaths: [String] {
+    /// Folders hidden from THIS MAC: drives or any folder inside them. The key predates folders.
+    private var hiddenTreePaths: [String] {
         UserDefaults.standard.stringArray(forKey: "hiddenVolumes") ?? []
     }
 
@@ -161,7 +167,7 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
         let volumes = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: nil, options: [.skipHiddenVolumes]) ?? []
         var drives = [FolderNode("Filesystem  /", url: URL(fileURLWithPath: "/"))]
         drives += volumes.filter { $0.path != "/" }.map { FolderNode($0.lastPathComponent, url: $0) }
-        drives.removeAll { node in node.url.map { hiddenVolumePaths.contains($0.standardizedFileURL.path) } ?? false }
+        drives.removeAll { node in node.url.map { hiddenTreePaths.contains($0.standardizedFileURL.path) } ?? false }
         drives.append(FolderNode("Trash", url: TrashStore.location, children: []))
         roots = [FolderNode("FAVORITES", children: favoriteNodes, group: true),
                  FolderNode("THIS MAC", children: drives, group: true)]
@@ -221,6 +227,7 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
         UserDefaults.standard.set(Array(collapsedGroups).sorted(), forKey: statePrefix + "collapsedTreeGroups")
     }
     func outlineViewSelectionDidChange(_ notification: Notification) {
+        updateHeaderButtons()
         guard !rebuilding, !restoringSelection, let node = outline.item(atRow: outline.selectedRow) as? FolderNode else { return }
         UserDefaults.standard.set(selectionID(node), forKey: statePrefix + "selectedTreeItem")
     }
@@ -237,7 +244,7 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
         return node.children == nil || !(node.children?.isEmpty ?? true)
     }
     func outlineView(_ outlineView: NSOutlineView, isGroupItem item: Any) -> Bool { (item as! FolderNode).group }
-    func outlineView(_ outlineView: NSOutlineView, rowViewForItem item: Any) -> NSTableRowView? { AccentRowView() }
+    func outlineView(_ outlineView: NSOutlineView, rowViewForItem item: Any) -> NSTableRowView? { SidebarRowView() }
     func outlineView(_ outlineView: NSOutlineView, shouldSelectItem item: Any) -> Bool { (item as! FolderNode).url != nil }
     func outlineView(_ outlineView: NSOutlineView, shouldExpandItem item: Any) -> Bool {
         let node = item as! FolderNode
@@ -258,8 +265,9 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
         guard !node.loading, let url = node.url else { return false }
         node.loading = true
         let hidden = hiddenFiles.showsHidden(in: url), version = generation
+        let hiddenFolders = Set(hiddenTreePaths)
         queue.async {
-            let result = Result { try FileSystem.contents(of: url, showHidden: hidden).filter(\.isDirectory) }
+            let result = Result { try FileSystem.contents(of: url, showHidden: hidden).filter { $0.isDirectory && !hiddenFolders.contains($0.url.standardizedFileURL.path) } }
             DispatchQueue.main.async {
                 guard self.generation == version else { return }
                 node.loading = false
@@ -315,8 +323,66 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
             NSLayoutConstraint.activate([image.leadingAnchor.constraint(equalTo: leading, constant: 6), image.centerYAnchor.constraint(equalTo: cell.centerYAnchor), image.widthAnchor.constraint(equalToConstant: 18), image.heightAnchor.constraint(equalToConstant: 18)])
             leading = image.trailingAnchor
         }
-        NSLayoutConstraint.activate([label.leadingAnchor.constraint(equalTo: leading, constant: 6), label.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4), label.centerYAnchor.constraint(equalTo: cell.centerYAnchor)])
+        var trailing = cell.trailingAnchor
+        if node === roots.last {
+            let actions = headerActions()
+            actions.translatesAutoresizingMaskIntoConstraints = false
+            cell.addSubview(actions)
+            NSLayoutConstraint.activate([actions.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -6), actions.centerYAnchor.constraint(equalTo: cell.centerYAnchor)])
+            trailing = actions.leadingAnchor
+        }
+        NSLayoutConstraint.activate([label.leadingAnchor.constraint(equalTo: leading, constant: 6), label.trailingAnchor.constraint(lessThanOrEqualTo: trailing, constant: -4), label.centerYAnchor.constraint(equalTo: cell.centerYAnchor)])
         return cell
+    }
+    /// The THIS MAC header's icons: hide or unhide the selected folder, and unhide everything.
+    private func headerActions() -> NSStackView {
+        func icon(_ symbol: String, _ help: String, _ action: Selector) -> NSButton {
+            let button = NSButton(image: NSImage(systemSymbolName: symbol, accessibilityDescription: help)!, target: self, action: action)
+            button.isBordered = false; button.imagePosition = .imageOnly
+            button.symbolConfiguration = .init(pointSize: 11, weight: .semibold)
+            button.contentTintColor = .secondaryLabelColor
+            button.setAccessibilityLabel(help)
+            ToolbarHelp.install(on: button, text: help)
+            button.widthAnchor.constraint(equalToConstant: 20).isActive = true
+            button.heightAnchor.constraint(equalToConstant: 20).isActive = true
+            return button
+        }
+        let hide = icon("eye.slash", "Hide the selected folder from the tree", #selector(toggleSelectedHidden))
+        let unhideAll = icon("arrow.uturn.backward", "Show all hidden folders", #selector(showAllVolumes))
+        hideButton = hide; unhideAllButton = unhideAll
+        let stack = NSStackView(views: [hide, unhideAll])
+        stack.spacing = 4
+        updateHeaderButtons()
+        return stack
+    }
+    /// The selected folder under THIS MAC, if it is one that can be hidden.
+    private var selectedTreeFolder: URL? {
+        guard let node = outline.item(atRow: outline.selectedRow) as? FolderNode, let url = node.url,
+              url != TrashStore.location, isInThisMac(node) else { return nil }
+        return url
+    }
+    private func isInThisMac(_ node: FolderNode) -> Bool {
+        var parent = outline.parent(forItem: node) as? FolderNode
+        while let current = parent {
+            if current === roots.last { return true }
+            parent = outline.parent(forItem: current) as? FolderNode
+        }
+        return false
+    }
+    private func updateHeaderButtons() {
+        let hiding = !hiddenTreePaths.isEmpty
+        hideButton?.isEnabled = selectedTreeFolder != nil
+        unhideAllButton?.isHidden = !hiding
+    }
+    @objc private func toggleSelectedHidden() {
+        guard let url = selectedTreeFolder else { return }
+        setHidden(url, !hiddenTreePaths.contains(url.standardizedFileURL.path))
+    }
+    func setHidden(_ url: URL, _ hidden: Bool) {
+        var paths = Set(hiddenTreePaths)
+        if hidden { paths.insert(url.standardizedFileURL.path) } else { paths.remove(url.standardizedFileURL.path) }
+        UserDefaults.standard.set(Array(paths).sorted(), forKey: "hiddenVolumes")
+        publishSharedChange()
     }
     @objc private func selected() {
         if let node = outline.item(atRow: outline.selectedRow) as? FolderNode, let url = node.url {
@@ -335,10 +401,11 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
         setExpansion(node, expanded: expanded)
     }
     func outlineView(_ outlineView: NSOutlineView, pasteboardWriterForItem item: Any) -> NSPasteboardWriting? {
-        guard let node = item as? FolderNode, let url = node.url,
-              (outlineView.parent(forItem: node) as? FolderNode) === roots.first else { return nil }
+        guard let node = item as? FolderNode, let url = node.url, url != TrashStore.location else { return nil }
+        let isFavorite = (outlineView.parent(forItem: node) as? FolderNode) === roots.first
+        guard isFavorite || isInThisMac(node) else { return nil }
         let writer = NSPasteboardItem()
-        writer.setString(url.path, forType: Self.favoriteDragType)
+        writer.setString(url.path, forType: isFavorite ? Self.favoriteDragType : Self.treeFolderDragType)
         return writer
     }
     private func favoriteDropIndex(item: Any?, childIndex: Int) -> Int? {
@@ -383,6 +450,12 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
         publishSharedChange()
     }
     func outlineView(_ outlineView: NSOutlineView, validateDrop info: NSDraggingInfo, proposedItem item: Any?, proposedChildIndex index: Int) -> NSDragOperation {
+        if let path = info.draggingPasteboard.string(forType: Self.treeFolderDragType) {
+            guard info.draggingSource is FolderOutlineView, !isFavorite(URL(fileURLWithPath: path)),
+                  let insertionIndex = favoriteDropIndex(item: item, childIndex: index) else { return [] }
+            outlineView.setDropItem(roots.first, dropChildIndex: insertionIndex)
+            return .move
+        }
         if let path = info.draggingPasteboard.string(forType: Self.favoriteDragType) {
             guard info.draggingSource is FolderOutlineView, favorites.contains(where: { $0.path == path }),
                   let insertionIndex = favoriteDropIndex(item: item, childIndex: index) else { return [] }
@@ -398,6 +471,12 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
         return FileTransfer.dragOperation(info)
     }
     func outlineView(_ outlineView: NSOutlineView, acceptDrop info: NSDraggingInfo, item: Any?, childIndex index: Int) -> Bool {
+        if let path = info.draggingPasteboard.string(forType: Self.treeFolderDragType) {
+            guard info.draggingSource is FolderOutlineView,
+                  let insertionIndex = favoriteDropIndex(item: item, childIndex: index) else { return false }
+            addFavorites([URL(fileURLWithPath: path)], at: insertionIndex)
+            return true
+        }
         if let path = info.draggingPasteboard.string(forType: Self.favoriteDragType) {
             guard info.draggingSource is FolderOutlineView,
                   let insertionIndex = favoriteDropIndex(item: item, childIndex: index) else { return false }
@@ -413,10 +492,7 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         guard let node = outline.item(atRow: outline.clickedRow) as? FolderNode else { return }
-        if node === roots.last {
-            menu.addItem(withTitle: "Show All Filesystems", action: #selector(showAllVolumes), keyEquivalent: "").target = self
-            return
-        }
+        if node === roots.last { appendHiddenFolderItems(to: menu); return }
         guard let url = node.url else { return }
         if url == TrashStore.location {
             menu.addItem(withTitle: "Clear Trash…", action: #selector(clearTrash), keyEquivalent: "").target = self
@@ -439,7 +515,7 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
         favorite.target = self; favorite.representedObject = url
         let volumes = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: nil) ?? []
         let mounted = url.path == "/" || volumes.contains(where: { $0.standardizedFileURL.path == url.standardizedFileURL.path })
-        if mounted {
+        if url != TrashStore.location {
             menu.addItem(.separator())
             let hide = menu.addItem(withTitle: "Hide from Tree", action: #selector(hideVolume(_:)), keyEquivalent: "")
             hide.target = self; hide.representedObject = url
@@ -457,10 +533,21 @@ final class Sidebar: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, N
         if let url = sender.representedObject as? URL { onUnmount?(url) }
     }
     @objc private func hideVolume(_ sender: NSMenuItem) {
-        guard let url = sender.representedObject as? URL else { return }
-        let paths = Set(hiddenVolumePaths + [url.standardizedFileURL.path])
-        UserDefaults.standard.set(Array(paths).sorted(), forKey: "hiddenVolumes")
-        publishSharedChange()
+        if let url = sender.representedObject as? URL { setHidden(url, true) }
+    }
+    /// The THIS MAC header menu: bring back one hidden folder, or all of them.
+    func appendHiddenFolderItems(to menu: NSMenu) {
+        let hidden = hiddenTreePaths
+        for path in hidden {
+            let item = menu.addItem(withTitle: "Show \(path == "/" ? "Filesystem /" : path)", action: #selector(unhideFromMenu(_:)), keyEquivalent: "")
+            item.target = self; item.representedObject = URL(fileURLWithPath: path)
+        }
+        if !hidden.isEmpty { menu.addItem(.separator()) }
+        let all = menu.addItem(withTitle: "Show All Hidden Folders", action: #selector(showAllVolumes), keyEquivalent: "")
+        all.target = self; all.isEnabled = !hidden.isEmpty
+    }
+    @objc private func unhideFromMenu(_ sender: NSMenuItem) {
+        if let url = sender.representedObject as? URL { setHidden(url, false) }
     }
     @objc private func showAllVolumes() {
         UserDefaults.standard.removeObject(forKey: "hiddenVolumes")

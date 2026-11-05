@@ -8,7 +8,9 @@
   A Liquid Glass Finder replacement for macOS.
 </p>
 
-![macOS Explorer](docs/screenshot-2.webp)
+![macOS Explorer in dark mode](docs/screenshot-dark.webp)
+
+![macOS Explorer in light mode](docs/screenshot-light.webp)
 
 Windows File Explorer's editable path bar, full-disk folder tree, combined with Finder's Spotlight search, Trash put-back and native look. Multi-tab and multi-window. Native AppKit with built-in updates. Requires macOS 14; Liquid Glass on macOS 26.
 
@@ -25,7 +27,7 @@ Windows File Explorer's editable path bar, full-disk folder tree, combined with 
 - Connect to network servers and browse shared folders.
 - Search that covers the current folder and its subfolders by default, using the Spotlight index.
 - A permissions editor that takes octal (`755`) or chmod-style strings (`u+x,go-w`).
-- Liquid Glass controls, windows and dialogs on macOS 26, with opacity, frosting and tint settings, plus custom titlebar tint, accent color and window outline.
+- Liquid Glass windows and dialogs on macOS 26, in five glass and blur styles, with optional tint and opacity, plus custom titlebar tint, accent color and window outline.
 
 ## Install
 
@@ -41,8 +43,8 @@ the engines that completed the latest release scan; click it for the full report
 
 ## Using Explorer
 
-Choose **Use Explorer as Default** in Settings to open “Show in Finder” requests
-in Explorer. Folders opened from the desktop or Dock still use Finder.
+In Settings → Show in Finder, choose **Use Explorer** to open “Show in Finder”
+requests in Explorer. Folders opened from the desktop or Dock still use Finder.
 
 If protected folders are blocked, Explorer shows a setup window at launch. Enable
 Full Disk Access using its Settings button; the window closes when access works.

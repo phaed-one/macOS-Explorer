@@ -60,6 +60,8 @@ func checkFavoriteAndVisibilityControls() throws {
     let parentButton = ancestorButtons().last!
     try require(ancestorButtons().first?.title == "/" && parentButton.title == root.lastPathComponent && ancestorButtons().allSatisfy { $0.image == nil && $0.bezelColor == nil }, "Details must show neutral ancestor buttons from root to parent without arrows")
     try require(!ancestorButtons().contains { $0.title == a.lastPathComponent }, "The current folder must not appear among its ancestors")
+    NotificationCenter.default.post(name: BrowserTheme.changed, object: nil)
+    try require((ancestorButtons() + [up]).allSatisfy { $0.bezelStyle == .rounded }, "Path buttons and the parent button must stay flat, not glass, even after an appearance change")
     let removedActions = ["goBack", "goForward", "goUp", "refresh"].map(NSSelectorFromString)
     try require(!all.compactMap { $0 as? NSButton }.contains { $0.action.map(removedActions.contains) == true }, "Back, Forward, Up, and Refresh buttons must be absent from the toolbar")
     let parentFrame = parentButton.convert(parentButton.bounds, to: browser.window!.contentView!)

@@ -41,40 +41,103 @@ final class DiskAccessController: NSWindowController, NSWindowDelegate {
     private var closingAfterGrant = false
     private(set) var status: DiskAccessStatus = .unknown
 
+    private let spinner = NSProgressIndicator()
+    private static let width: CGFloat = 620
+
     init(probe: @escaping () -> DiskAccessStatus = { DiskAccessProbe.status() }, onAccessGranted: @escaping () -> Void = {}) {
         self.probe = probe; self.onAccessGranted = onAccessGranted
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 550, height: 365),
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: Self.width, height: 380),
                             styleMask: [.titled, .closable], backing: .buffered, defer: false)
         panel.isFloatingPanel = false; panel.level = .normal; panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         super.init(window: panel)
         panel.title = "Enable Full Disk Access"; panel.delegate = self
-        let title = NSTextField(wrappingLabelWithString: "Allow Explorer to browse protected folders")
-        title.font = .systemFont(ofSize: 19, weight: .semibold)
-        let instructions = NSTextField(wrappingLabelWithString: "Explorer needs Full Disk Access to browse folders such as Mail and Messages.\n\n1. Open System Settings below.\n2. Turn on Explorer under Full Disk Access. If it’s missing, add Explorer.app with the + button.\n3. If macOS asks, choose Quit & Reopen.")
-        instructions.textColor = .secondaryLabelColor
-        let buttons = NSStackView(views: [NSButton(title: "Open System Settings…", target: self, action: #selector(openSettings)),
-            NSButton(title: "Show Explorer.app", target: self, action: #selector(revealApp)), restartButton])
+        let inner = Self.width - 48
+
+        // Header: what's needed, and why.
+        let symbol = NSImageView(image: NSImage(systemSymbolName: "lock.shield.fill", accessibilityDescription: nil)!)
+        symbol.symbolConfiguration = .init(pointSize: 22, weight: .semibold)
+        symbol.contentTintColor = .white
+        let badge = Self.circle(diameter: 44, color: .controlAccentColor, holding: symbol)
+        let title = NSTextField(labelWithString: "Explorer needs Full Disk Access")
+        title.font = .systemFont(ofSize: 17, weight: .semibold)
+        let subtitle = NSTextField(wrappingLabelWithString: "macOS blocks protected folders, such as Mail, Messages and Safari, until you allow it.")
+        subtitle.textColor = .secondaryLabelColor
+        subtitle.preferredMaxLayoutWidth = inner - 58
+        let titles = NSStackView(views: [title, subtitle])
+        titles.orientation = .vertical; titles.alignment = .leading; titles.spacing = 3
+        let header = NSStackView(views: [badge, titles])
+        header.alignment = .centerY; header.spacing = 14
+
+        // Steps: each action sits next to the step it belongs to.
         restartButton.target = self; restartButton.action = #selector(restart)
+        let steps = [
+            ("Open Privacy & Security → Full Disk Access.", NSButton(title: "Open System Settings…", target: self, action: #selector(openSettings))),
+            ("Turn on Explorer. If it isn’t listed, click + and add Explorer.app.", NSButton(title: "Show Explorer.app", target: self, action: #selector(revealApp))),
+            ("If macOS asks, choose Quit & Reopen. Otherwise, restart Explorer.", restartButton)]
+        let grid = NSGridView(views: steps.enumerated().map { index, step in
+            let label = NSTextField(wrappingLabelWithString: step.0)
+            label.preferredMaxLayoutWidth = inner - 32 - 24 - 200 - 24
+            return [Self.stepNumber(index + 1), label, step.1]
+        })
+        grid.rowSpacing = 14; grid.columnSpacing = 12
+        grid.column(at: 1).width = inner - 32 - 24 - 200 - 24
+        grid.column(at: 2).xPlacement = .trailing
+        grid.column(at: 2).width = 200
+        for index in 0..<grid.numberOfRows { grid.row(at: index).yPlacement = .center }
+        let stepsCard = SettingsCard(title: nil, width: inner, content: [grid])
+
+        // Status: the window closes itself once access works.
+        spinner.style = .spinning; spinner.controlSize = .small
+        spinner.isDisplayedWhenStopped = false
         statusLabel.font = .systemFont(ofSize: 12); statusLabel.textColor = .secondaryLabelColor
-        statusLabel.heightAnchor.constraint(equalToConstant: 34).isActive = true
-        let appPath = NSTextField(wrappingLabelWithString: Bundle.main.bundleURL.path)
+        statusLabel.preferredMaxLayoutWidth = inner - 24
+        statusLabel.stringValue = "Waiting for access… This window closes on its own once it works."
+        let status = NSStackView(views: [spinner, statusLabel])
+        status.alignment = .centerY; status.spacing = 8
+
+        // Footer: where the app is (for the + button), and a way out.
+        let appPath = NSTextField(labelWithString: Bundle.main.bundleURL.path)
         appPath.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
-        appPath.textColor = .secondaryLabelColor; appPath.isSelectable = true
+        appPath.textColor = .tertiaryLabelColor; appPath.isSelectable = true
+        appPath.lineBreakMode = .byTruncatingMiddle
+        appPath.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         let later = NSButton(title: "Continue with Limited Access", target: self, action: #selector(continueForNow))
-        let stack = NSStackView(views: [title, instructions, buttons, statusLabel, appPath, later])
-        stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 14
+        let footer = NSStackView(views: [appPath, later])
+        footer.alignment = .centerY; footer.spacing = 16
+        footer.widthAnchor.constraint(equalToConstant: inner).isActive = true
+
+        let stack = NSStackView(views: [header, stepsCard, status, footer])
+        stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 16
+        stack.setCustomSpacing(20, after: header)
         stack.translatesAutoresizingMaskIntoConstraints = false
         let content = panel.contentView!
         content.addSubview(stack)
-        NSLayoutConstraint.activate([stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 24),
+        NSLayoutConstraint.activate([stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 12),
             stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 24),
             stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -24)])
-        for label in [title, instructions, statusLabel, appPath] { label.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true }
         content.layoutSubtreeIfNeeded()
-        panel.setContentSize(NSSize(width: 550, height: stack.fittingSize.height + 48))
+        panel.setContentSize(NSSize(width: Self.width, height: stack.fittingSize.height + 36))
         panel.center()
         DialogAppearance.install(on: panel)
+    }
+    /// A filled circle with a view centered in it.
+    private static func circle(diameter: CGFloat, color: NSColor, holding inner: NSView) -> NSView {
+        let circle = NSView()
+        circle.wantsLayer = true; circle.layer?.cornerRadius = diameter / 2
+        circle.layer?.backgroundColor = color.cgColor
+        circle.translatesAutoresizingMaskIntoConstraints = false
+        inner.translatesAutoresizingMaskIntoConstraints = false
+        circle.addSubview(inner)
+        NSLayoutConstraint.activate([circle.widthAnchor.constraint(equalToConstant: diameter), circle.heightAnchor.constraint(equalToConstant: diameter),
+            inner.centerXAnchor.constraint(equalTo: circle.centerXAnchor), inner.centerYAnchor.constraint(equalTo: circle.centerYAnchor)])
+        return circle
+    }
+    private static func stepNumber(_ number: Int) -> NSView {
+        let digit = NSTextField(labelWithString: "\(number)")
+        digit.font = .systemFont(ofSize: 12, weight: .bold)
+        digit.textColor = .controlAccentColor
+        return circle(diameter: 24, color: NSColor.controlAccentColor.withAlphaComponent(0.18), holding: digit)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     deinit { timer?.invalidate(); NotificationCenter.default.removeObserver(self) }
@@ -102,18 +165,21 @@ final class DiskAccessController: NSWindowController, NSWindowDelegate {
             closingAfterGrant = true; close(); closingAfterGrant = false
             if previous == .denied { onAccessGranted() }
         } else if result == .denied, !dismissedForSession {
-            statusLabel.stringValue = "This window closes when access works. If you enabled it and it’s still blocked, restart Explorer."
+            statusLabel.stringValue = "Waiting for access… This window closes on its own once it works."
+            spinner.startAnimation(nil)
             if timer == nil {
                 showWindow(nil); window?.makeKeyAndOrderFront(nil)
                 let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.check() }
                 self.timer = timer; RunLoop.main.add(timer, forMode: .common)
             }
         } else if result == .unknown, window?.isVisible == true {
-            statusLabel.stringValue = "Couldn’t confirm access yet. If you already enabled it, restart Explorer."
+            statusLabel.stringValue = "Couldn’t confirm access yet. If you already turned it on, restart Explorer."
+            spinner.stopAnimation(nil)
         }
     }
     func windowWillClose(_ notification: Notification) {
         timer?.invalidate(); timer = nil
+        spinner.stopAnimation(nil)
         if !closingAfterGrant { dismissedForSession = true }
     }
     @objc private func continueForNow() { close() }

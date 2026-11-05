@@ -105,10 +105,13 @@ private final class BrowserTabView: NSView, NSDraggingSource {
         for child in [select, close] { child.translatesAutoresizingMaskIntoConstraints = false; addSubview(child) }
         NSLayoutConstraint.activate([select.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10), select.topAnchor.constraint(equalTo: topAnchor), select.bottomAnchor.constraint(equalTo: bottomAnchor), select.trailingAnchor.constraint(equalTo: close.leadingAnchor, constant: -6), close.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8), close.centerYAnchor.constraint(equalTo: centerYAnchor), close.widthAnchor.constraint(equalToConstant: 22)])
         registerForDraggedTypes([.fileURL, TabTransfer.pasteboardType]); refresh()
+        NotificationCenter.default.addObserver(self, selector: #selector(refresh), name: BrowserTheme.changed, object: nil)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-    private func refresh() {
-        BrowserTheme.paint(self, color: dropHighlight ? .selectedContentBackgroundColor : selected ? BrowserTheme.chrome : .clear)
+    @objc private func refresh() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            BrowserTheme.paint(self, color: dropHighlight ? .selectedContentBackgroundColor : selected ? BrowserTheme.chrome : .clear)
+        }
     }
     override func mouseDown(with event: NSEvent) {
         guard let window else { return }

@@ -2,7 +2,7 @@ import AppKit
 
 func checkInitialFavoriteOrder() throws {
     let defaults = UserDefaults.standard
-    let keys = ["favorites", "applicationsFirstFavoriteOrderApplied"]
+    let keys = ["favorites", "homeFirstFavoriteOrderApplied"]
     let saved = keys.map { defaults.object(forKey: $0) }
     defer {
         for (key, value) in zip(keys, saved) {
@@ -13,18 +13,18 @@ func checkInitialFavoriteOrder() throws {
     let home = FileManager.default.homeDirectoryForCurrentUser.path
     keys.forEach { defaults.removeObject(forKey: $0) }
     let fresh = Sidebar().favorites.map(\.path)
-    try require(fresh.first == "/Applications" && fresh.last == home, "Applications must be first and Home last for new users")
+    try require(fresh.first == home && fresh.dropFirst().first == "/Applications", "Home must be first and Applications second for new users: \(fresh)")
     defaults.removeObject(forKey: keys[1])
-    defaults.set([home, "/tmp/Custom-A", "/Applications", "/tmp/Custom-B"], forKey: "favorites")
+    defaults.set(["/tmp/Custom-A", "/Applications", home, "/tmp/Custom-B"], forKey: "favorites")
     let migrated = Sidebar().favorites.map(\.path)
-    try require(migrated == ["/Applications", "/tmp/Custom-A", "/tmp/Custom-B", home], "Upgrade must move Applications first and Home last while preserving custom favorites")
-    let reordered = [home, "/Applications", "/tmp/Custom-A"]
+    try require(migrated == [home, "/tmp/Custom-A", "/Applications", "/tmp/Custom-B"], "Upgrade must move Home first and keep everything else in order: \(migrated)")
+    let reordered = ["/Applications", home, "/tmp/Custom-A"]
     defaults.set(reordered, forKey: "favorites")
-    try require(Sidebar().favorites.map(\.path) == reordered, "After migration, manual favorite ordering must remain available")
+    try require(Sidebar().favorites.map(\.path) == reordered, "After the upgrade, manual favorite ordering must remain available")
     defaults.removeObject(forKey: keys[1])
     defaults.set(["/tmp/Only-Custom"], forKey: "favorites")
     try require(Sidebar().favorites.map(\.path) == ["/tmp/Only-Custom"], "Upgrade must not re-add removed favorites")
-    print("PASS: Applications first and Home last by default and on upgrade; custom favorites and later reordering preserved")
+    print("PASS: Home first by default and on upgrade; custom favorites and later reordering preserved")
 }
 
 func checkFavoriteReordering() throws {
@@ -69,7 +69,9 @@ func checkFavoriteReordering() throws {
     let mac = sidebar.outlineView(outline, child: 1, ofItem: nil) as! FolderNode
     try require(sidebar.outlineView(outline, validateDrop: unchanged, proposedItem: mac.children!.first!, proposedChildIndex: -1).isEmpty, "Favorite reordering must reject filesystem destinations")
     try require(!sidebar.outlineView(outline, acceptDrop: unchanged, item: mac.children!.first!, childIndex: -1), "An invalid drop must not transfer the folder")
-    try require(sidebar.outlineView(outline, pasteboardWriterForItem: mac.children!.first!) == nil, "Filesystem rows must not become favorite reorder sources")
+    let treeWriter = sidebar.outlineView(outline, pasteboardWriterForItem: mac.children!.first!) as? NSPasteboardItem
+    try require(treeWriter != nil && !treeWriter!.types.contains(.init("com.pathfind.favorite")) && !treeWriter!.types.contains(.fileURL),
+        "Filesystem rows must drag only as tree folders, never as favorites or files")
     let append = try drag(0)
     try require(sidebar.outlineView(outline, acceptDrop: append, item: group(sidebar), childIndex: -1), "Dropping on the Favorites header must append")
     let restarted = Sidebar()
@@ -131,4 +133,64 @@ func checkFolderDropsAddFavorites() throws {
     try require(sidebar.outlineView(outline, acceptDrop: onto, item: group().children![0], childIndex: -1), "Dropping a folder onto a favorite must still copy into it")
     try require(fileTransfers == 1 && sidebar.favorites.map(\.path) == [a.path], "Dropping onto a favorite must copy, not add a favorite")
     print("PASS: Folders dropped on the Favorites header or between favorites are added there; drops onto a favorite still copy")
+}
+
+func checkTreeHidingAndFavoriteDrops() throws {
+    let defaults = UserDefaults.standard
+    let keys = ["favorites", "hiddenVolumes"]
+    let saved = keys.map { defaults.object(forKey: $0) }
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("PathfindTree-\(UUID().uuidString)").standardizedFileURL
+    defer {
+        for (key, value) in zip(keys, saved) {
+            if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
+        }
+        try? FileManager.default.removeItem(at: root)
+    }
+    defaults.set([NSHomeDirectory()], forKey: "favorites")
+    defaults.removeObject(forKey: "hiddenVolumes")
+    let sidebar = Sidebar()
+    let outline = sidebar.outline
+    func group(_ index: Int) -> FolderNode { sidebar.outlineView(outline, child: index, ofItem: nil) as! FolderNode }
+    let mac = group(1), filesystem = mac.children!.first!
+    // THIS MAC header icons.
+    let header = sidebar.outlineView(outline, viewFor: outline.tableColumns[0], item: mac)!
+    let icons = descendants(header).compactMap { $0 as? NSButton }
+    let hide = icons.first { $0.accessibilityLabel() == "Hide the selected folder from the tree" }
+    let unhideAll = icons.first { $0.accessibilityLabel() == "Show all hidden folders" }
+    try require(hide != nil && unhideAll != nil, "THIS MAC must show hide and unhide-all icons: \(icons.map { $0.accessibilityLabel() ?? "" })")
+    try require(unhideAll!.isHidden, "Unhide all must only appear while something is hidden")
+    outline.deselectAll(nil)
+    try require(!hide!.isEnabled, "Hide needs a selected THIS MAC folder")
+    let row = outline.row(forItem: filesystem)
+    outline.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+    try require(hide!.isEnabled, "Selecting a THIS MAC folder must enable Hide")
+    hide!.performClick(nil)
+    try require((defaults.stringArray(forKey: "hiddenVolumes") ?? []) == ["/"], "Hide must hide the selected folder")
+    let reloaded = group(1)
+    try require(!(reloaded.children ?? []).contains { $0.url?.path == "/" }, "A hidden folder must leave the tree")
+    let newHeader = sidebar.outlineView(outline, viewFor: outline.tableColumns[0], item: reloaded)!
+    let newUnhide = descendants(newHeader).compactMap { $0 as? NSButton }.first { $0.accessibilityLabel() == "Show all hidden folders" }!
+    try require(!newUnhide.isHidden, "Unhide all must appear once something is hidden")
+    // The header's right-click menu can bring back one folder.
+    let menu = NSMenu()
+    sidebar.setHidden(root, true)
+    sidebar.appendHiddenFolderItems(to: menu)
+    try require(menu.items.contains { $0.title == "Show Filesystem /" } && menu.items.contains { $0.title == "Show \(root.path)" }, "The header menu must list each hidden folder: \(menu.items.map(\.title))")
+    let showOne = menu.items.first { $0.title == "Show \(root.path)" }!
+    NSApp.sendAction(showOne.action!, to: showOne.target, from: showOne)
+    try require((defaults.stringArray(forKey: "hiddenVolumes") ?? []) == ["/"], "Showing one hidden folder must leave the others hidden")
+    newUnhide.performClick(nil)
+    try require((defaults.stringArray(forKey: "hiddenVolumes") ?? []).isEmpty && group(1).children!.contains { $0.url?.path == "/" }, "Unhide all must bring every folder back")
+
+    // Dragging a tree folder into Favorites.
+    let fs = group(1).children!.first!
+    let writer = sidebar.outlineView(outline, pasteboardWriterForItem: fs) as! NSPasteboardItem
+    let drag = TestDrag(); drag.draggingSource = outline
+    drag.draggingPasteboard.writeObjects([writer])
+    try require(sidebar.outlineView(outline, validateDrop: drag, proposedItem: group(0), proposedChildIndex: 1) == .move, "A tree folder must be droppable into Favorites")
+    try require(sidebar.outlineView(outline, validateDrop: drag, proposedItem: fs, proposedChildIndex: -1).isEmpty, "A tree folder must not be droppable anywhere but Favorites")
+    try require(sidebar.outlineView(outline, acceptDrop: drag, item: group(0), childIndex: 1), "Dropping a tree folder into Favorites must succeed")
+    try require(sidebar.favorites.map(\.path) == [NSHomeDirectory(), "/"], "The dropped folder must be added where it was dropped: \(sidebar.favorites.map(\.path))")
+    try require(sidebar.outlineView(outline, validateDrop: drag, proposedItem: group(0), proposedChildIndex: 0).isEmpty, "A folder that is already a favorite must not be added twice")
+    print("PASS: THIS MAC hides any selected folder, unhides one or all from its header, and tree folders drag into Favorites only")
 }

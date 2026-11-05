@@ -5,7 +5,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     private let sidebar: Sidebar
     private let table = FileTableView()
     private let icons = IconBrowser()
-    private let split = NSSplitView()
+    private let split = SidebarSplitView()
     private let files = BrowserScrollView()
     private let tabStrip = TabStrip()
     private let backdrop = WindowBackdrop()
@@ -325,6 +325,9 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         windowOutline.frame = root.bounds
         windowOutline.autoresizingMask = [.width, .height]
         root.addSubview(windowOutline)
+        let resize = WindowResizeView(frame: root.bounds)
+        resize.autoresizingMask = [.width, .height]
+        root.addSubview(resize)
     }
     private func installWindowControls(in root: NSView, window: NSWindow) {
         for type in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
@@ -1035,7 +1038,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             path.backgroundColor = BrowserTheme.field
             search.backgroundColor = BrowserTheme.field
             fieldSurfaces.forEach(GlassControls.tintFieldSurface)
-            GlassControls.apply(to: root)
+            GlassControls.apply(to: root, excluding: [tabStrip, ancestorPathBar])
             sidebar.outline.backgroundColor = .clear
             table.backgroundColor = .clear
             icons.collection.backgroundColors = [.clear]

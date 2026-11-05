@@ -1,58 +1,124 @@
 import AppKit
 
+/// How the window material looks. The first two are Liquid Glass; the rest are classic
+/// behind-window blurs, which also stand in for Liquid Glass before macOS 26.
+enum GlassStyle: String, CaseIterable {
+    case bright, dark, vivid, soft, smoke
+    var title: String {
+        switch self {
+        case .bright: "Bright glass"
+        case .dark: "Dark glass"
+        case .vivid: "Vivid blur"
+        case .soft: "Soft blur"
+        case .smoke: "Smoke"
+        }
+    }
+    var usesLiquidGlass: Bool {
+        guard #available(macOS 26, *) else { return false }
+        return self == .bright || self == .dark
+    }
+    var material: NSVisualEffectView.Material {
+        switch self {
+        case .vivid: .hudWindow
+        case .bright, .soft: .fullScreenUI
+        case .dark, .smoke: .underWindowBackground
+        }
+    }
+}
+
 enum BrowserTheme {
-    static let appearancePreferenceKeys = ["frostedPanes", "paneOpacity", "glassTint", "glassFrosting", "titlebarTint", "titlebarOpacity", "titlebarTintEnabled", "accentColor", "windowOutlineEnabled", "windowOutlineColor"]
+    /// Every Appearance setting is kept separately for light and dark.
+    static let themedKeys = ["frostedPanes", "paneOpacity", "glassTint", "glassTintEnabled", "glassStyle", "titlebarTint",
+                             "titlebarOpacity", "titlebarTintEnabled", "accentColor", "windowOutlineEnabled", "windowOutlineColor"]
+    static let appearancePreferenceKeys = ["appearanceMode", "chromeDarkColor", "chromeLightColor", "glassFrosted", "glassFrosting"]
+        + themedKeys + themedKeys.flatMap { ["\($0).dark", "\($0).light"] }
+    static func themedKey(_ key: String, dark: Bool = darkMode) -> String { "\(key).\(dark ? "dark" : "light")" }
+    /// This theme's own value; a value saved before settings were per theme still applies until replaced.
+    static func themed(_ key: String) -> Any? {
+        UserDefaults.standard.object(forKey: themedKey(key)) ?? UserDefaults.standard.object(forKey: key)
+    }
+    static func setThemed(_ value: Any?, forKey key: String) {
+        if let value { UserDefaults.standard.set(value, forKey: themedKey(key)) }
+        else { UserDefaults.standard.removeObject(forKey: themedKey(key)) }
+    }
+    /// Once: drop the old shared values so each theme starts from its own defaults.
+    static func migrateToThemedAppearance() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: "themedAppearanceMigrated") else { return }
+        themedKeys.forEach(defaults.removeObject(forKey:))
+        defaults.set(true, forKey: "themedAppearanceMigrated")
+    }
     static func resetAppearance() {
         for key in appearancePreferenceKeys { UserDefaults.standard.removeObject(forKey: key) }
         initializeAccent()
+        applyAppearanceMode()
         NotificationCenter.default.post(name: changed, object: nil)
     }
     static let changed = Notification.Name("PathfindAppearanceChanged")
-    static var frosted: Bool { UserDefaults.standard.object(forKey: "frostedPanes") as? Bool ?? true }
-    static var frosting: Double { min(1, max(0, UserDefaults.standard.double(forKey: "glassFrosting"))) }
+    static var frosted: Bool { themed("frostedPanes") as? Bool ?? true }
+    /// Off leaves the glass untinted: no color layer, so opacity and tint color don't apply.
+    static var glassTintEnabled: Bool { themed("glassTintEnabled") as? Bool ?? false }
+    static var glassStyle: GlassStyle {
+        (themed("glassStyle") as? String).flatMap(GlassStyle.init(rawValue:)) ?? (darkMode ? .soft : .smoke)
+    }
     static var opacity: Double {
-        guard UserDefaults.standard.object(forKey: "paneOpacity") != nil else { return 0.80 }
-        return min(1, max(0.01, UserDefaults.standard.double(forKey: "paneOpacity")))
+        guard let value = themed("paneOpacity") as? Double else { return 0.01 }
+        return min(1, max(0.01, value))
     }
     static func shade(dark: CGFloat, light: CGFloat) -> NSColor {
         NSColor(name: nil) { appearance in
             NSColor(white: appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light, alpha: 1)
         }
     }
-    static var chrome: NSColor { shade(dark: 0, light: 1) }
-    static var outlineEnabled: Bool { UserDefaults.standard.object(forKey: "windowOutlineEnabled") as? Bool ?? true }
+    /// Explorer picks its own light or dark look instead of following macOS.
+    static var darkMode: Bool { UserDefaults.standard.string(forKey: "appearanceMode") != "light" }
+    static func applyAppearanceMode() {
+        NSApp?.appearance = NSAppearance(named: darkMode ? .darkAqua : .aqua)
+    }
+    static func chromeColorKey(dark: Bool) -> String { dark ? "chromeDarkColor" : "chromeLightColor" }
+    /// The header band behind the path bar and toolbar, and the selected tab. Each mode keeps its own color.
+    static func chromeColor(dark: Bool) -> NSColor {
+        if let rgb = UserDefaults.standard.array(forKey: chromeColorKey(dark: dark)) as? [Double], rgb.count == 3 {
+            return NSColor(srgbRed: rgb[0], green: rgb[1], blue: rgb[2], alpha: 1)
+        }
+        return dark ? .black : .white
+    }
+    static var chrome: NSColor {
+        NSColor(name: nil) { appearance in chromeColor(dark: appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua) }
+    }
+    static var outlineEnabled: Bool { themed("windowOutlineEnabled") as? Bool ?? false }
     static var outlineColor: NSColor {
-        if let rgb = UserDefaults.standard.array(forKey: "windowOutlineColor") as? [Double], rgb.count == 3 {
+        if let rgb = themed("windowOutlineColor") as? [Double], rgb.count == 3 {
             return NSColor(srgbRed: rgb[0], green: rgb[1], blue: rgb[2], alpha: 1)
         }
         return .black
     }
     static var titlebarTintEnabled: Bool {
-        UserDefaults.standard.object(forKey: "titlebarTintEnabled") as? Bool ?? true
+        themed("titlebarTintEnabled") as? Bool ?? true
     }
     static var titlebarTint: NSColor {
-        if let rgb = UserDefaults.standard.array(forKey: "titlebarTint") as? [Double], rgb.count == 3 {
+        if let rgb = themed("titlebarTint") as? [Double], rgb.count == 3 {
             return NSColor(srgbRed: rgb[0], green: rgb[1], blue: rgb[2], alpha: 1)
         }
-        return NSColor(srgbRed: 59.0 / 255, green: 59.0 / 255, blue: 63.0 / 255, alpha: 1)
+        return NSColor(srgbRed: 0.2403, green: 0.2530, blue: 0.3082, alpha: 1)
     }
     static var accentColor: NSColor {
-        if let rgb = UserDefaults.standard.array(forKey: "accentColor") as? [Double], rgb.count == 3 {
+        if let rgb = themed("accentColor") as? [Double], rgb.count == 3 {
             return NSColor(srgbRed: rgb[0], green: rgb[1], blue: rgb[2], alpha: 1)
         }
         return titlebarTint
     }
     static func initializeAccent() {
-        guard UserDefaults.standard.object(forKey: "accentColor") == nil,
+        guard themed("accentColor") == nil,
               let color = titlebarTint.usingColorSpace(.sRGB) else { return }
-        UserDefaults.standard.set([Double(color.redComponent), Double(color.greenComponent), Double(color.blueComponent)], forKey: "accentColor")
+        setThemed([Double(color.redComponent), Double(color.greenComponent), Double(color.blueComponent)], forKey: "accentColor")
     }
     static var titlebarOpacity: Double {
-        guard UserDefaults.standard.object(forKey: "titlebarOpacity") != nil else { return 0.65 }
-        return min(1, max(0, UserDefaults.standard.double(forKey: "titlebarOpacity")))
+        guard let value = themed("titlebarOpacity") as? Double else { return 0.38 }
+        return min(1, max(0, value))
     }
     static var pane: NSColor {
-        if let rgb = UserDefaults.standard.array(forKey: "glassTint") as? [Double], rgb.count == 3 {
+        if let rgb = themed("glassTint") as? [Double], rgb.count == 3 {
             return NSColor(srgbRed: rgb[0], green: rgb[1], blue: rgb[2], alpha: 1)
         }
         return shade(dark: 0, light: 1)
@@ -77,7 +143,7 @@ enum BrowserTheme {
 final class WindowBackdrop: NSView {
     let contentView = NSView()
     private let effect: NSView
-    private let frost = NSVisualEffectView()
+    private let blur = NSVisualEffectView()
     let tint = NSView()
     private var foreground: [NSView] = []
     var isUsingGlass: Bool { glassAttached }
@@ -94,11 +160,9 @@ final class WindowBackdrop: NSView {
         }
         super.init(frame: frameRect)
         wantsLayer = true; layer?.cornerRadius = 20; layer?.masksToBounds = true
-        frost.blendingMode = .behindWindow
-        frost.material = .underWindowBackground
-        frost.state = .active
-        frost.frame = bounds; frost.autoresizingMask = [.width, .height]
-        addSubview(frost)
+        blur.blendingMode = .behindWindow; blur.state = .active
+        blur.frame = bounds; blur.autoresizingMask = [.width, .height]
+        addSubview(blur)
         effect.frame = bounds; effect.autoresizingMask = [.width, .height]
         addSubview(effect)
         contentView.frame = bounds; contentView.autoresizingMask = [.width, .height]
@@ -131,7 +195,7 @@ final class WindowBackdrop: NSView {
         // exact window bounds, so material sizing cannot feed back into UI layout.
         let materialFrame = bounds.insetBy(dx: -3, dy: -3)
         if effect.frame != materialFrame { effect.frame = materialFrame }
-        if frost.frame != bounds { frost.frame = bounds }
+        if blur.frame != bounds { blur.frame = bounds }
         for child in foreground {
             let target = bounds
             if child.frame != target { child.frame = target }
@@ -146,14 +210,19 @@ final class WindowBackdrop: NSView {
         needsLayout = true
     }
     @objc func refresh() {
-        let opacity = BrowserTheme.frosted ? BrowserTheme.opacity : 1
-        let useGlass = opacity > 0 && opacity < 1
+        // Without Liquid Glass the window is solid; untinted glass has no color layer at all.
+        let opacity = !BrowserTheme.frosted ? 1 : BrowserTheme.glassTintEnabled ? BrowserTheme.opacity : 0
+        let useGlass = BrowserTheme.frosted && opacity < 1
         // Keep layout and input outside the material's managed content hierarchy.
         // Switching opacity only affects the decorative backdrop, never the UI tree.
         glassAttached = useGlass
-        effect.isHidden = !useGlass
-        frost.isHidden = !useGlass || BrowserTheme.frosting == 0
-        frost.alphaValue = BrowserTheme.frosting
+        let style = BrowserTheme.glassStyle
+        effect.isHidden = !useGlass || !style.usesLiquidGlass
+        blur.isHidden = !useGlass || style.usesLiquidGlass
+        if #available(macOS 26, *), let glass = effect as? NSGlassEffectView {
+            glass.style = style == .dark ? .regular : .clear
+        }
+        blur.material = style.material
         BrowserTheme.paint(tint, color: BrowserTheme.pane.withAlphaComponent(opacity))
         sizeContent()
         needsLayout = true
@@ -161,6 +230,22 @@ final class WindowBackdrop: NSView {
     }
     override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); refresh() }
     deinit { NotificationCenter.default.removeObserver(self) }
+}
+
+/// The translucent fill and hairline edge of a Settings card stacked on the dialog glass.
+/// Call it while the view's appearance is current (as in `updateLayer`) so the colors resolve.
+enum GlassCard {
+    static let cornerRadius: CGFloat = 12
+    static func paint(_ view: NSView, cornerRadius: CGFloat = cornerRadius) {
+        view.wantsLayer = true
+        guard let layer = view.layer else { return }
+        layer.cornerRadius = cornerRadius
+        layer.cornerCurve = .continuous
+        layer.masksToBounds = true
+        layer.backgroundColor = NSColor.labelColor.withAlphaComponent(0.05).cgColor
+        layer.borderColor = NSColor.labelColor.withAlphaComponent(0.08).cgColor
+        layer.borderWidth = 1
+    }
 }
 
 /// A transparent viewport; the window supplies the single material behind it.
@@ -217,9 +302,22 @@ final class ChromeView: NSView {
         super.viewDidChangeEffectiveAppearance()
         effectiveAppearance.performAsCurrentDrawingAppearance { onAppearanceChange?() }
     }
+    /// Clicks on blank chrome, such as the tab strip behind the tabs, arrive here unhandled.
+    /// Borderless windows can't rely on AppKit's background dragging, so drag explicitly.
+    override func mouseDown(with event: NSEvent) { window?.performDrag(with: event) }
 }
 
 /// Preserve the accent when a selected row loses keyboard/window emphasis.
+/// Sidebar rows: no separator under the FAVORITES and THIS MAC headers.
+final class SidebarRowView: AccentRowView {
+    override func drawSeparator(in dirtyRect: NSRect) {}
+}
+
+/// The sidebar divider uses the same light hairline as other separators instead of a black line.
+final class SidebarSplitView: NSSplitView {
+    override var dividerColor: NSColor { .separatorColor }
+}
+
 class AccentRowView: NSTableRowView {
     override func drawSelection(in dirtyRect: NSRect) {
         guard selectionHighlightStyle != .none else { return }

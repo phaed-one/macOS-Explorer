@@ -2,7 +2,7 @@ import AppKit
 
 func checkDialogAppearance() throws {
     let defaults = UserDefaults.standard
-    let keys = ["paneOpacity", "frostedPanes", "glassFrosting"]
+    let keys = ["paneOpacity", "frostedPanes", "glassStyle", "glassTintEnabled"].map { BrowserTheme.themedKey($0) }
     let saved = Dictionary(uniqueKeysWithValues: keys.map { ($0, defaults.object(forKey: $0)) })
     defer {
         for key in keys {
@@ -10,7 +10,7 @@ func checkDialogAppearance() throws {
         }
         NotificationCenter.default.post(name: BrowserTheme.changed, object: nil)
     }
-    defaults.set(true, forKey: "frostedPanes"); defaults.set(0.35, forKey: "paneOpacity")
+    BrowserTheme.setThemed(true, forKey: "frostedPanes"); BrowserTheme.setThemed(true, forKey: "glassTintEnabled"); BrowserTheme.setThemed(0.35, forKey: "paneOpacity")
     let file = FileManager.default.temporaryDirectory.appendingPathComponent("Explorer-Glass-\(UUID()).txt")
     try Data("Glass dialog check".utf8).write(to: file)
     defer { try? FileManager.default.removeItem(at: file) }
@@ -54,7 +54,7 @@ func checkDialogAppearance() throws {
         DialogAppearance.install(on: window)
         try require(window.contentView!.subviews.filter { $0 is WindowBackdrop }.count == 1, "Repeated presentation must not stack duplicate glass materials")
     }
-    defaults.set(0.65, forKey: "paneOpacity")
+    BrowserTheme.setThemed(0.65, forKey: "paneOpacity")
     NotificationCenter.default.post(name: BrowserTheme.changed, object: nil)
     for controller in controllers {
         let view = try background(controller.window!)

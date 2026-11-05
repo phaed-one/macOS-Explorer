@@ -14,24 +14,29 @@ func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(de
 let app = NSApplication.shared
 app.setActivationPolicy(.prohibited)
 let defaults = UserDefaults.standard
-let savedKeys = ["explicitExpandedTreePaths", "collapsedTreeGroups", "hiddenVolumes", "frostedPanes", "paneOpacity", "glassTint", "browserTabs", "titlebarTint", "titlebarOpacity", "titlebarTintEnabled", "accentColor", "windowOutlineEnabled", "windowOutlineColor", "glassFrosting", "defaultShowHiddenFiles", "folderHiddenFiles", "filesystemShowHiddenDefaultApplied", "favorites"]
-let saved = Dictionary(uniqueKeysWithValues: savedKeys.map { ($0, defaults.object(forKey: $0)) })
+let savedKeys = ["explicitExpandedTreePaths", "collapsedTreeGroups", "hiddenVolumes", "frostedPanes", "paneOpacity", "glassTint", "browserTabs", "titlebarTint", "titlebarOpacity", "titlebarTintEnabled", "accentColor", "windowOutlineEnabled", "windowOutlineColor", "glassFrosting", "glassFrosted", "glassStyle", "glassTintEnabled", "defaultShowHiddenFiles", "folderHiddenFiles", "filesystemShowHiddenDefaultApplied", "favorites"]
+// Also save each theme's own appearance values, without repeating keys already listed.
+let allSavedKeys = savedKeys + BrowserTheme.appearancePreferenceKeys.filter { !savedKeys.contains($0) }
+let saved = Dictionary(uniqueKeysWithValues: allSavedKeys.map { ($0, defaults.object(forKey: $0)) })
+// Old shared appearance values would stand in for per-theme ones; start every run without them.
+BrowserTheme.themedKeys.forEach(defaults.removeObject(forKey:))
 defer {
-    for key in savedKeys {
+    for key in allSavedKeys {
         if let value = saved[key] ?? nil { defaults.set(value, forKey: key) }
         else { defaults.removeObject(forKey: key) }
     }
 }
 do {
-    defaults.set(true, forKey: "frostedPanes")
-    defaults.removeObject(forKey: "glassTint")
+    BrowserTheme.setThemed(true, forKey: "frostedPanes")
+    BrowserTheme.setThemed(true, forKey: "glassTintEnabled")
+    BrowserTheme.setThemed(nil, forKey: "glassTint")
     defaults.removeObject(forKey: "browserTabs")
     for appearanceName in [NSAppearance.Name.darkAqua, .aqua] {
         let appearance = NSAppearance(named: appearanceName)!
         let pane = WindowBackdrop(frame: NSRect(x: 0, y: 0, width: 300, height: 200))
         pane.appearance = appearance
         for opacity in [0.01, 0.25, 0.5, 0.75, 1.0] {
-            defaults.set(opacity, forKey: "paneOpacity")
+            BrowserTheme.setThemed(opacity, forKey: "paneOpacity")
             appearance.performAsCurrentDrawingAppearance { pane.refresh() }
             let tint = pane.tint
             let color = NSColor(cgColor: tint.layer!.backgroundColor!)!.usingColorSpace(.deviceRGB)!
@@ -44,23 +49,23 @@ do {
             }
         }
     }
-    defaults.set(0, forKey: "paneOpacity")
+    BrowserTheme.setThemed(0, forKey: "paneOpacity")
     try require(BrowserTheme.opacity == 0.01, "Saved zero opacity must be clamped to the 1% minimum")
     print("PASS: Native pane opacity at 1%, 25%, 50%, 75%, 100% in dark and light appearances")
-    defaults.set([0.15, 0.35, 0.55], forKey: "glassTint")
+    BrowserTheme.setThemed([0.15, 0.35, 0.55], forKey: "glassTint")
     let custom = BrowserTheme.pane.usingColorSpace(.sRGB)!
     try require(abs(custom.redComponent - 0.15) < 0.001 && abs(custom.blueComponent - 0.55) < 0.001, "Custom glass tint must persist its RGB color")
-    defaults.removeObject(forKey: "glassTint")
+    BrowserTheme.setThemed(nil, forKey: "glassTint")
     print("PASS: Custom glass tint")
     let glassTintBefore = BrowserTheme.pane.usingColorSpace(.sRGB)
-    defaults.removeObject(forKey: "accentColor")
-    defaults.set([0.2, 0.3, 0.5], forKey: "titlebarTint")
-    defaults.set(0.4, forKey: "titlebarOpacity")
+    BrowserTheme.setThemed(nil, forKey: "accentColor")
+    BrowserTheme.setThemed([0.2, 0.3, 0.5], forKey: "titlebarTint")
+    BrowserTheme.setThemed(0.4, forKey: "titlebarOpacity")
     try require(abs(BrowserTheme.titlebarTint.usingColorSpace(.sRGB)!.blueComponent - 0.5) < 0.001 && BrowserTheme.titlebarOpacity == 0.4, "Titlebar tint and opacity must persist")
     BrowserTheme.initializeAccent()
     let seededAccent = BrowserTheme.accentColor.usingColorSpace(.sRGB)
     try require(seededAccent == BrowserTheme.titlebarTint.usingColorSpace(.sRGB), "Accent must start with the current titlebar tint")
-    defaults.set([0.7, 0.2, 0.1], forKey: "titlebarTint")
+    BrowserTheme.setThemed([0.7, 0.2, 0.1], forKey: "titlebarTint")
     BrowserTheme.initializeAccent()
     try require(BrowserTheme.accentColor.usingColorSpace(.sRGB) == seededAccent, "Changing titlebar tint or restarting must preserve independent Accent")
     try require(BrowserTheme.pane.usingColorSpace(.sRGB) == glassTintBefore, "Titlebar tint must not change glass tint")
@@ -71,7 +76,7 @@ do {
     for size in [NSSize(width: 1120, height: 740), NSSize(width: 900, height: 440), NSSize(width: 1500, height: 1000)] {
         window.setContentSize(size)
         for opacity in [0.01, 0.5, 1.0, 0.25, 0.01] {
-            defaults.set(opacity, forKey: "paneOpacity")
+            BrowserTheme.setThemed(opacity, forKey: "paneOpacity")
             NotificationCenter.default.post(name: BrowserTheme.changed, object: nil)
             window.contentView!.layoutSubtreeIfNeeded()
             RunLoop.main.run(until: Date().addingTimeInterval(0.02))
@@ -141,7 +146,7 @@ do {
         try require(abs(textRect.midY - field.bounds.midY) < 0.5, "Header text must be vertically centered")
     }
     print("PASS: Square toolbar buttons, matching rectangular fields, centered text, and independent titlebar tint")
-    defaults.set(0.5, forKey: "paneOpacity")
+    BrowserTheme.setThemed(0.5, forKey: "paneOpacity")
     NotificationCenter.default.post(name: BrowserTheme.changed, object: nil)
     window.contentView!.layoutSubtreeIfNeeded()
     let tabButton = descendants(window.contentView!).compactMap { $0 as? NSButton }.first { $0.accessibilityHelp()?.hasPrefix("/") == true }!
@@ -202,12 +207,12 @@ do {
     accentWell.sendAction(accentWell.action, to: accentWell.target)
     try require(abs(BrowserTheme.accentColor.usingColorSpace(.sRGB)!.blueComponent - 0.6) < 0.001 && abs(BrowserTheme.titlebarTint.usingColorSpace(.sRGB)!.redComponent - 0.7) < 0.001, "Accent picker must not change titlebar tint")
     print("PASS: Independent Accent settings initialize from titlebar tint and persist separately")
-    let savedAccent = defaults.object(forKey: "accentColor")
-    defaults.set([0.1, 0.15, 0.2], forKey: "accentColor")
+    let savedAccent = BrowserTheme.themed("accentColor")
+    BrowserTheme.setThemed([0.1, 0.15, 0.2], forKey: "accentColor")
     let darkField = NSAppearance(named: .darkAqua)!
     var lowAccentField: NSColor!
     darkField.performAsCurrentDrawingAppearance { lowAccentField = BrowserTheme.field.usingColorSpace(.sRGB) }
-    defaults.set([0.5, 0.75, 1.0], forKey: "accentColor")
+    BrowserTheme.setThemed([0.5, 0.75, 1.0], forKey: "accentColor")
     darkField.performAsCurrentDrawingAppearance {
         let highAccentField = BrowserTheme.field.usingColorSpace(.sRGB)!
         try! require(abs(lowAccentField.redComponent - highAccentField.redComponent) < 0.001 && abs(lowAccentField.blueComponent - highAccentField.blueComponent) < 0.001 && highAccentField.blueComponent > highAccentField.redComponent, "Field tint must use Accent hue without inheriting its brightness")
@@ -217,15 +222,28 @@ do {
         NSAppearance(named: name)!.performAsCurrentDrawingAppearance { field = BrowserTheme.field.usingColorSpace(.genericRGB) }
         try require(abs(field.saturationComponent - 0.5) < 0.001 && abs(field.brightnessComponent - brightness) < 0.001, "Path/search must inherit full Accent saturation while preserving dark/light brightness")
     }
-    if let savedAccent { defaults.set(savedAccent, forKey: "accentColor") } else { defaults.removeObject(forKey: "accentColor") }
+    if let savedAccent { BrowserTheme.setThemed(savedAccent, forKey: "accentColor") } else { BrowserTheme.setThemed(nil, forKey: "accentColor") }
     print("PASS: Path/search fields use Accent hue and saturation at their existing dark/light brightness")
-    let frostingSlider = descendants(settings.window!.contentView!).compactMap { $0 as? LiveSlider }.first { $0.action == NSSelectorFromString("frostingChanged") }!
-    let opacityBeforeFrosting = BrowserTheme.opacity
-    frostingSlider.setAccessibilityValue(0.7)
-    try require(abs(BrowserTheme.frosting - 0.7) < 0.001 && BrowserTheme.opacity == opacityBeforeFrosting, "Frosting must be adjustable independently of opacity: frosting \(BrowserTheme.frosting), slider \(frostingSlider.doubleValue), opacity \(BrowserTheme.opacity) vs \(opacityBeforeFrosting)")
-    let activeFrost = descendants(window.contentView!).compactMap { $0 as? NSVisualEffectView }.contains { $0.state == .active && !$0.isHidden && abs($0.alphaValue - 0.7) < 0.001 }
-    try require(activeFrost, "Frosting must use an always-active live backdrop")
-    print("PASS: Frosting slider controls an always-active native backdrop independently of opacity")
+    let glassStyle = descendants(settings.window!.contentView!).compactMap { $0 as? NSPopUpButton }.first { $0.accessibilityLabel() == "Glass style" }!
+    try require(glassStyle.itemTitles == GlassStyle.allCases.map(\.title), "Settings must offer every glass style: \(glassStyle.itemTitles)")
+    let opacityBeforeStyle = BrowserTheme.opacity
+    let backdrop = descendants(window.contentView!).compactMap { $0 as? WindowBackdrop }.first!
+    for (index, style) in GlassStyle.allCases.enumerated() {
+        glassStyle.selectItem(at: index)
+        glassStyle.sendAction(glassStyle.action, to: glassStyle.target)
+        try require(BrowserTheme.glassStyle == style && BrowserTheme.opacity == opacityBeforeStyle, "Glass style must switch independently of opacity")
+        // Only the window's own material; the path and search fields keep their own clear glass.
+        let shown = backdrop.subviews.filter { !$0.isHidden && ($0 is NSVisualEffectView || String(describing: type(of: $0)).contains("Glass")) }
+        try require(shown.count == 1, "Exactly one window material must show for \(style): \(shown.map { type(of: $0) })")
+        if style.usesLiquidGlass, #available(macOS 26, *) {
+            try require((shown[0] as? NSGlassEffectView)?.style == (style == .dark ? .regular : .clear), "\(style.title) must be Liquid Glass in the matching style")
+        } else {
+            let blur = shown[0] as? NSVisualEffectView
+            try require(blur?.material == style.material && blur?.blendingMode == .behindWindow && blur?.state == .active && blur?.alphaValue == 1,
+                "\(style.title) must be a full, always-active blur of what's behind the window")
+        }
+    }
+    print("PASS: Each glass style shows exactly one matching window material, independently of opacity")
     let inactiveRow = AccentRowView(frame: NSRect(x: 0, y: 0, width: 40, height: 24))
     inactiveRow.isSelected = true; inactiveRow.isEmphasized = false
     inactiveRow.selectionHighlightStyle = .regular
@@ -252,7 +270,7 @@ do {
     outlineToggle.performClick(nil)
     try require(BrowserTheme.outlineEnabled, "Outline can be re-enabled")
     print("PASS: App-owned window outline can be disabled with native control and resize behavior retained")
-    let titlebarToggle = descendants(settings.window!.contentView!).compactMap { $0 as? NSButton }.first { $0.title == "Enable titlebar tint" }!
+    let titlebarToggle = descendants(settings.window!.contentView!).compactMap { $0 as? NSButton }.first { $0.title == "Tint the titlebar" }!
     let tintBeforeToggle = BrowserTheme.titlebarTint.usingColorSpace(.sRGB)
     let opacityBeforeToggle = BrowserTheme.titlebarOpacity
     titlebarToggle.state = .on
@@ -335,14 +353,18 @@ do {
     try checkServerConnections()
     try checkIconSpacing()
     try checkFolderDropsAddFavorites()
+    try checkTreeHidingAndFavoriteDrops()
     try checkNameConflictPrompts()
+    try checkPermissionDialog()
     try checkLiveFolderUpdates()
     try checkPathCompletion()
     try checkSearchAndHeaderFocus()
     try checkMomentaryButtonHighlight()
     try checkHalfThicknessScrollbars()
     try checkSettingsReset()
+    try checkThemeMode()
     try checkDialogAppearance()
+    try checkBrowserEdgeResizing()
     let volume = URL(fileURLWithPath: "/Volumes/Pathfind-QA")
     if FileManager.default.fileExists(atPath: volume.appendingPathComponent("FOLDER1").path) {
         defaults.set([], forKey: "explicitExpandedTreePaths")

@@ -42,19 +42,19 @@ const terminals = [...source.matchAll(/case \.\w+: return "([^"]+)"/g)].map(matc
 if (terminals.length !== 14) throw new Error('Review the terminal catalog before publishing release notes');
 const body = `### What’s new
 
-- **Window resizing:** Fixed clicks passing through transparent window corners instead of resizing Explorer.
-- **Parent folder:** A left chevron before the path buttons opens the parent folder.
-- **Icon spacing:** A smaller slider beside icon size adjusts the gaps between files and folders.
-- **Reset to Defaults:** Restore appearance settings in one click.
-- **Liquid Glass dialogs:** Settings, file information, permissions, server connections, access setup, and app alerts now share Explorer's glass appearance.
-- Dialog glass extends through the titlebar, and empty dialog backgrounds can be dragged.
-- Pressed and active toolbar icons use native Liquid Glass on macOS 26.
-- Glass styling extends to path and search fields, navigation and dialog buttons, suggestions, and tooltips. The main toolbar/header background stays unchanged. Tabs and their + and × buttons retain their original flat appearance.
-- Removed focus rings from the path and search inputs.
-- Refreshed app icon with a glass background and 70% black tint.
-
-- **Connect to Server:** Click the server icon to the right of Favorites on the toolbar (⌘K) to open shared folders from SMB, AFP, NFS, or WebDAV servers. Sign in when asked and browse the share in Explorer.
-- **Full Disk Access setup:** If protected folders are blocked, a setup window appears at launch with a shortcut to System Settings. It closes when access works, with a restart option if needed.
+- **Light and dark themes:** Choose Light or Dark in Settings → Theme. Explorer keeps its own look instead of following macOS.
+- **Per-theme appearance:** Every Appearance setting, and the header color behind the toolbar and selected tab, is saved separately for light and dark.
+- **Glass styles:** Pick Bright glass, Dark glass, Vivid blur, Soft blur or Smoke. Tinting is now optional, with its own switch.
+- **Redesigned Settings:** A wide two-column window with Updates, Theme, Show in Finder and Appearance, all visible without scrolling.
+- **Redesigned dialogs:** Full Disk Access setup puts each step next to its button. Permissions shows owner and group, a live \`rwxr-xr-x\` preview, and chmod input side by side.
+- **Resize from any edge:** Every window edge and corner now resizes Explorer, with the matching cursor.
+- **Drag the window by its tab strip:** Empty space beside the tabs moves the window.
+- **Hide folders from This Mac:** Hide any folder in the tree with the eye icon on the This Mac header. Bring one back from the header's right-click menu, or all of them with the undo icon.
+- **Drag tree folders into Favorites:** Drag a folder from This Mac onto Favorites, or between two favorites.
+- Your home folder is now first in Favorites.
+- The sidebar divider is a light hairline, the line under Favorites is gone, and the window outline is off by default.
+- Path buttons are flat again, and the color picker's glass covers the whole panel.
+- New app icon in dark glass that fits the macOS 26 icon shape.
 
 ### Updates
 

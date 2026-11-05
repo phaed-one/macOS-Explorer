@@ -37,6 +37,10 @@ func checkDiskAccessOnboarding() throws {
     for button in buttons {
         try require(content.bounds.contains(button.convert(button.bounds, to: content)), "Permission actions must fit inside the popup")
     }
+    let stepActions = ["Open System Settings…", "Show Explorer.app", "Restart Explorer"].compactMap { title in buttons.first { $0.title == title } }
+    let rightEdges = Set(stepActions.map { Int($0.convert($0.bounds, to: content).maxX.rounded()) })
+    try require(stepActions.count == 3 && rightEdges.count == 1, "Each step's action must line up in one right-hand column: \(rightEdges)")
+    try require(controller.window!.frame.width > controller.window!.frame.height, "The access dialog must be wider than tall")
     value.set(.granted)
     // No explicit check: the visible prompt must close itself when access works.
     try waitUntil { controller.status == .granted && controller.window?.isVisible == false && refreshes == 1 }

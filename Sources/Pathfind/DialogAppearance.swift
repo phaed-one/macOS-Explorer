@@ -24,6 +24,17 @@ enum DialogAppearance {
         }
         content.addSubview(background(in: content.bounds), positioned: .below, relativeTo: nil)
     }
+    /// Panels AppKit lays out itself, like the color panel, keep their content view. The glass goes
+    /// behind the whole frame instead, so it also covers the titlebar and toolbar.
+    static func installBehindFrame(on window: NSWindow) {
+        if let content = window.contentView { GlassControls.apply(to: content) }
+        guard let frame = window.contentView?.superview,
+              !frame.subviews.contains(where: { $0.identifier?.rawValue == "ExplorerDialogGlass" }) else { return }
+        window.isOpaque = false; window.backgroundColor = .clear
+        window.titlebarAppearsTransparent = true
+        window.titlebarSeparatorStyle = .none
+        frame.addSubview(background(in: frame.bounds), positioned: .below, relativeTo: nil)
+    }
     fileprivate static func background(in bounds: NSRect) -> WindowBackdrop {
         let background = WindowBackdrop(frame: bounds)
         background.identifier = NSUserInterfaceItemIdentifier("ExplorerDialogGlass")

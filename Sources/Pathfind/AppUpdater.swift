@@ -53,7 +53,7 @@ import Sparkle
         super.init(frame: .zero)
         orientation = .vertical; alignment = .leading; spacing = 10
         let heading = NSTextField(labelWithString: "Updates")
-        heading.font = .systemFont(ofSize: 17, weight: .semibold)
+        heading.font = .systemFont(ofSize: 13, weight: .semibold)
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "development build"
         let current = NSTextField(labelWithString: "Installed: Explorer \(version)")
         current.textColor = .secondaryLabelColor
