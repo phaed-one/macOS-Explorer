@@ -56,8 +56,6 @@ final class SettingsController: NSWindowController {
         restoreFinderButton.target = self; restoreFinderButton.action = #selector(restoreFinder)
         defaultManagerStatus.widthAnchor.constraint(equalToConstant: inner).isActive = true
         let managerHint = Self.hint("Folders opened from the desktop or Dock still use Finder; macOS doesn’t let any app change that. Reopen other apps after switching.", width: inner)
-        let finderCard = SettingsCard(title: "Show in Finder", width: Self.columnWidth, fillsHeight: true, content: [
-            defaultManagerStatus, NSStackView(views: [defaultManagerButton, restoreFinderButton]), managerHint])
         // Theme: Explorer's own light or dark look, and the header color for each.
         themeMode.target = self; themeMode.action = #selector(themeModeChanged)
         themeMode.setAccessibilityLabel("Theme")
@@ -67,13 +65,7 @@ final class SettingsController: NSWindowController {
         chromeColor.heightAnchor.constraint(equalToConstant: 24).isActive = true
         let resetChrome = NSButton(title: "Reset", target: self, action: #selector(resetChromeColor))
         resetChrome.setAccessibilityLabel("Use default header color")
-        let themeGrid = NSGridView(views: [[Self.rowLabel("Mode"), themeMode], [Self.rowLabel("Header"), Self.row(chromeColor, resetChrome)]])
-        themeGrid.rowSpacing = 10; themeGrid.columnSpacing = 12
-        themeGrid.column(at: 0).xPlacement = .trailing
-        themeGrid.column(at: 0).width = 52
-        for index in 0..<themeGrid.numberOfRows { themeGrid.row(at: index).yPlacement = .center }
-        let themeHint = Self.hint("Toolbar band and selected tab, saved for each mode.", width: inner)
-        let themeCard = SettingsCard(title: "Theme", width: Self.columnWidth, fillsHeight: true, content: [themeGrid, themeHint])
+        let themeHint = Self.hint("Every Appearance setting is saved separately for light and dark.", width: 320)
         // Startup: what Explorer brings back when it opens.
         restoreFrame.target = self; restoreFrame.action = #selector(startupOptionChanged(_:))
         restoreTabs.target = self; restoreTabs.action = #selector(startupOptionChanged(_:))
@@ -87,13 +79,12 @@ final class SettingsController: NSWindowController {
         startupGrid.column(at: 0).width = 52
         for index in 0..<startupGrid.numberOfRows { startupGrid.row(at: index).yPlacement = .center }
         let startupCard = SettingsCard(title: "Startup", width: Self.columnWidth, content: [startupGrid])
-        // Three columns keep Settings wide and short: app, behavior, then appearance.
-        let general = NSStackView(views: [SettingsCard(title: nil, width: Self.columnWidth, content: [updates]), themeCard])
-        let behavior = NSStackView(views: [startupCard, finderCard])
-        for column in [general, behavior] {
-            column.orientation = .vertical; column.alignment = .leading; column.spacing = 16
-            column.distribution = .fill
-        }
+        let finderCard = SettingsCard(title: "Show in Finder", width: Self.columnWidth, fillsHeight: true, content: [
+            defaultManagerStatus, NSStackView(views: [defaultManagerButton, restoreFinderButton]), managerHint])
+        // Left column: what Explorer does. Right column: how it looks, per theme.
+        let general = NSStackView(views: [SettingsCard(title: nil, width: Self.columnWidth, content: [updates]), startupCard, finderCard])
+        general.orientation = .vertical; general.alignment = .leading; general.spacing = 16
+        general.distribution = .fill
         updateDefaultManagerStatus()
 
         // Right column: how Explorer looks.
@@ -141,6 +132,10 @@ final class SettingsController: NSWindowController {
         let empty = NSGridCell.emptyContentView
         let accentHint = Self.hint("Button highlights and inactive selections", width: 300)
         let grid = NSGridView(views: [
+            [Self.groupHeader("Theme"), empty],
+            [Self.rowLabel("Mode"), themeMode],
+            [empty, themeHint],
+            [Self.rowLabel("Header"), Self.row(chromeColor, resetChrome)],
             [Self.groupHeader("Window Glass"), empty],
             [empty, glass],
             [glassStyleLabel, glassStyle],
@@ -161,17 +156,18 @@ final class SettingsController: NSWindowController {
         grid.column(at: 0).xPlacement = .trailing
         grid.column(at: 0).width = 70
         for index in 0..<grid.numberOfRows { grid.row(at: index).yPlacement = .center }
-        for index in [0, 6, 10] {
+        for index in [0, 4, 10, 14] {
             let row = grid.row(at: index)
             row.mergeCells(in: NSRange(location: 0, length: 2))
             row.cell(at: 0).xPlacement = .leading
             if index > 0 { row.topPadding = 10 }
         }
-        grid.row(at: 12).topPadding = -6
+        grid.row(at: 2).topPadding = -6
+        grid.row(at: 16).topPadding = -6
         let reset = NSButton(title: "Reset to Defaults", target: self, action: #selector(resetToDefaults))
         let appearance = SettingsCard(title: "Appearance", accessory: reset, width: Self.appearanceWidth, fillsHeight: true, content: [grid])
 
-        let columns = NSStackView(views: [general, behavior, appearance])
+        let columns = NSStackView(views: [general, appearance])
         columns.orientation = .horizontal; columns.alignment = .top; columns.spacing = 20
         columns.edgeInsets = NSEdgeInsets(top: 8, left: 24, bottom: 24, right: 24)
         columns.translatesAutoresizingMaskIntoConstraints = false
@@ -179,8 +175,7 @@ final class SettingsController: NSWindowController {
         content.addSubview(columns)
         NSLayoutConstraint.activate([columns.topAnchor.constraint(equalTo: content.topAnchor),
                                      columns.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-                                     general.heightAnchor.constraint(equalTo: appearance.heightAnchor),
-                                     behavior.heightAnchor.constraint(equalTo: appearance.heightAnchor)])
+                                     general.heightAnchor.constraint(equalTo: appearance.heightAnchor)])
         syncAppearanceControls()
         window.setContentSize(columns.fittingSize)
         window.center()
