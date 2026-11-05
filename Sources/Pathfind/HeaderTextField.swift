@@ -45,7 +45,9 @@ final class HeaderTextField: NSTextField {
         textCell.isEditable = true; textCell.isSelectable = true
         textCell.isBezeled = true; textCell.bezelStyle = .roundedBezel
         textCell.drawsBackground = true; textCell.usesSingleLineMode = true
+        textCell.focusRingType = .none
         cell = textCell
+        focusRingType = .none
         if let symbol, let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) {
             let icon = NSImageView(image: image)
             icon.contentTintColor = .secondaryLabelColor

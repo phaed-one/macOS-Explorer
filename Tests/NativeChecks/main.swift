@@ -136,6 +136,7 @@ do {
     let headerFields = descendants(window.contentView!).compactMap { $0 as? HeaderTextField }
     try require(headerFields.count == 2 && abs(headerFields[0].frame.height - headerFields[1].frame.height) < 0.5, "Path and search must use matching heights")
     for field in headerFields {
+        try require(field.focusRingType == .none && field.cell!.focusRingType == .none, "Path and search must not draw focus rings")
         let textRect = field.cell!.drawingRect(forBounds: field.bounds)
         try require(abs(textRect.midY - field.bounds.midY) < 0.5, "Header text must be vertically centered")
     }
@@ -159,13 +160,10 @@ do {
     browser.navigate(URL(fileURLWithPath: "/tmp"))
     try waitUntil { window.representedURL?.path == "/tmp" }
     let originalTab = descendants(surface).compactMap { $0 as? NSButton }.first { $0.accessibilityHelp() == originalFolder.path }!
-    if #available(macOS 26, *) {
-        var ancestor = originalTab.superview
-        while ancestor != nil && !(ancestor is NSGlassEffectView) { ancestor = ancestor?.superview }
-        try require((ancestor as? NSGlassEffectView)?.tintColor == .clear, "Inactive tabs must use untinted glass")
-    } else {
-        try require(originalTab.superview?.layer?.backgroundColor?.alpha == 0, "Inactive tabs must have transparent backgrounds")
-    }
+    try require(originalTab.superview?.layer?.backgroundColor?.alpha == 0, "Inactive tabs must have transparent backgrounds")
+    try require(!plus.isBordered && !originalTab.isBordered, "Tabs and the new-tab button must retain their original flat appearance")
+    let closeTabButtons = descendants(surface).compactMap { $0 as? NSButton }.filter { $0.accessibilityHelp() == "Close tab (⌘W)" }
+    try require(!closeTabButtons.isEmpty && closeTabButtons.allSatisfy { !$0.isBordered }, "Tab close buttons must remain plain icons")
     originalTab.performClick(nil)
     try waitUntil { window.representedURL?.path == originalFolder.path }
     print("PASS: Glass forwards tab clicks and native tab buttons switch folders")

@@ -49,7 +49,8 @@ const body = `### What’s new
 - **Liquid Glass dialogs:** Settings, file information, permissions, server connections, access setup, and app alerts now share Explorer's glass appearance.
 - Dialog glass extends through the titlebar, and empty dialog backgrounds can be dragged.
 - Pressed and active toolbar icons use native Liquid Glass on macOS 26.
-- Glass styling extends to tabs, path and search fields, navigation and dialog buttons, suggestions, and tooltips. The main toolbar/header background stays unchanged.
+- Glass styling extends to path and search fields, navigation and dialog buttons, suggestions, and tooltips. The main toolbar/header background stays unchanged. Tabs and their + and × buttons retain their original flat appearance.
+- Removed focus rings from the path and search inputs.
 - Refreshed app icon with a glass background and 70% black tint.
 
 - **Connect to Server:** Click the server icon to the right of Favorites on the toolbar (⌘K) to open shared folders from SMB, AFP, NFS, or WebDAV servers. Sign in when asked and browse the share in Explorer.
