@@ -42,7 +42,12 @@ const terminals = [...source.matchAll(/case \.\w+: return "([^"]+)"/g)].map(matc
 if (terminals.length !== 14) throw new Error('Review the terminal catalog before publishing release notes');
 const body = `### What’s new
 
-- **Connect to Server:** Click **Connect to Server** on the toolbar (⌘K) to open shared folders from SMB, AFP, NFS, or WebDAV servers. Sign in when asked and browse the share in Explorer.
+- **Window resizing:** Fixed clicks passing through transparent window corners instead of resizing Explorer.
+- **Parent folder:** A left chevron before the path buttons opens the parent folder.
+- **Icon spacing:** A smaller slider beside icon size adjusts the gaps between files and folders.
+- **Reset to Defaults:** Restore appearance settings in one click.
+
+- **Connect to Server:** Click the server icon to the right of Favorites on the toolbar (⌘K) to open shared folders from SMB, AFP, NFS, or WebDAV servers. Sign in when asked and browse the share in Explorer.
 - **Full Disk Access setup:** If protected folders are blocked, a setup window appears at launch with a shortcut to System Settings. It closes when access works, with a restart option if needed.
 
 ### Updates

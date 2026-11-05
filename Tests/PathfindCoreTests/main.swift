@@ -75,6 +75,9 @@ func checkFolderViews() throws {
     try expect(store.view(for: b) == FolderViewPreferences(), "Unconfigured folders inherit the initial default")
     let reopened = FolderViewStore(defaults: defaults)
     try expect(reopened.view(for: a) == custom, "Per-folder settings survive store recreation")
+    try expect(reopened.view(for: a).iconSpacing == nil, "Older saved views without spacing retain their existing preferences")
+    custom.iconSpacing = 28; reopened.save(custom, for: a)
+    try expect(FolderViewStore(defaults: defaults).view(for: a).iconSpacing == 28, "Icon spacing survives store recreation")
     var newDefault = FolderViewPreferences(); newDefault.mode = .details; newDefault.sort = .size
     reopened.makeDefault(newDefault)
     try expect(reopened.view(for: b) == newDefault, "Unconfigured folders inherit the new default")

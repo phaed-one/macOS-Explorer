@@ -21,6 +21,7 @@ Windows File Explorer's editable path bar, full-disk folder tree, combined with 
 - Windows-style keys: F2 renames, Return opens.
 - Drag tabs out to create new windows.
 - Drag files and folders onto other tabs to copy them; right-drag to move them.
+- Adjust icon size and spacing with separate toolbar sliders.
 - Connect to network servers and browse shared folders.
 - Search that covers the current folder and its subfolders by default, using the Spotlight index.
 - A permissions editor that takes octal (`755`) or chmod-style strings (`u+x,go-w`).
@@ -47,7 +48,7 @@ If protected folders are blocked, Explorer shows a setup window at launch. Enabl
 Full Disk Access using its Settings button; the window closes when access works.
 Restart Explorer if macOS asks.
 
-Click **Connect to Server** on the toolbar (⌘K) and enter a server address, such as
+Click the server icon to the right of Favorites on the toolbar (⌘K) and enter an address, such as
 `smb://server/share`. Sign in if asked, then browse the share in Explorer.
 SMB, AFP, NFS, and WebDAV servers are supported.
 

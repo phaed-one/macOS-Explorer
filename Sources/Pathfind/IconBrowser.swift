@@ -35,14 +35,21 @@ final class IconBrowser: NSObject, NSCollectionViewDataSource, NSCollectionViewD
     var currentFolder = FileManager.default.homeDirectoryForCurrentUser
     var iconSize: CGFloat = 64 {
         didSet {
-            layout.itemSize = NSSize(width: max(100, iconSize + 38), height: iconSize + 54)
+            updateLayout()
             collection.reloadData()
         }
     }
+    var iconSpacing: CGFloat = 10 { didSet { updateLayout() } }
+    private func updateLayout() {
+        let gap = min(40, max(0, iconSpacing))
+        layout.itemSize = NSSize(width: max(72 + 2.8 * gap, iconSize + 16 + 2.2 * gap), height: iconSize + 42 + 1.2 * gap)
+        layout.minimumInteritemSpacing = max(0, gap - 4)
+        layout.minimumLineSpacing = gap
+        layout.invalidateLayout()
+    }
     override init() {
         super.init()
-        layout.itemSize = NSSize(width: 102, height: 118)
-        layout.minimumInteritemSpacing = 6; layout.minimumLineSpacing = 10
+        updateLayout()
         layout.sectionInset = NSEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
         collection.collectionViewLayout = layout
         collection.frame = NSRect(x: 0, y: 0, width: 800, height: 500)

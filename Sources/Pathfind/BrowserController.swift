@@ -37,6 +37,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     var sessionTabs: BrowserTabs { tabs }
     var canTransferTabs: Bool { !busy }
     private let iconSlider = LiveSlider(value: 64, minValue: 32, maxValue: 160, target: nil, action: nil)
+    private let spacingSlider = LiveSlider(value: 10, minValue: 0, maxValue: 40, target: nil, action: nil)
     private let viewMenu = NSMenu(), sortMenu = NSMenu()
     private let viewToggle = NSSegmentedControl()
     private let viewStore = FolderViewStore()
@@ -216,6 +217,11 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         iconSlider.widthAnchor.constraint(equalToConstant: 110).isActive = true
         iconSlider.setAccessibilityLabel("Icon size")
         ToolbarHelp.install(on: iconSlider, text: "Icon size")
+        spacingSlider.target = self; spacingSlider.action = #selector(iconSpacingChanged)
+        spacingSlider.isContinuous = true; spacingSlider.controlSize = .small
+        spacingSlider.widthAnchor.constraint(equalToConstant: 56).isActive = true
+        spacingSlider.setAccessibilityLabel("Icon spacing")
+        ToolbarHelp.install(on: spacingSlider, text: "Icon spacing — tight to wide")
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
@@ -232,15 +238,9 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             return self.current
         })
         path.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let connect = NSButton(title: "Connect to Server", image: NSImage(systemSymbolName: "server.rack", accessibilityDescription: nil)!, target: self, action: #selector(connectToServer))
-        connect.bezelStyle = .texturedRounded; connect.imagePosition = .imageLeft
-        connect.controlSize = .large
-        connect.heightAnchor.constraint(equalToConstant: 36).isActive = true
-        connect.setContentHuggingPriority(.required, for: .horizontal)
-        connect.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let connect = button("server.rack", "Connect to Server (⌘K)", #selector(connectToServer))
         connect.setAccessibilityLabel("Connect to Server")
-        ToolbarHelp.install(on: connect, text: "Connect to Server (⌘K)")
-        let navigation = NSStackView(views: [path, search, connect])
+        let navigation = NSStackView(views: [path, search])
         navigation.spacing = 6
         navigation.heightAnchor.constraint(equalToConstant: 52).isActive = true
         let spacer = NSView(); spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -263,11 +263,13 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             button("clipboard", "Paste (⌘V)", #selector(pasteFiles)),
             button("pencil", "Rename (F2)", #selector(rename)),
             button("trash", "Move to Trash (⌘Delete)", #selector(trash)),
-            divider(), sortControl, viewToggle, viewControl, iconSlider, divider(), hidden, folderHidden,
-            favorite, spacer,
+            divider(), sortControl, viewToggle, viewControl, iconSlider, spacingSlider, divider(), hidden, folderHidden,
+            favorite, connect, spacer,
             settings
         ])
-        commands.spacing = 10; commands.heightAnchor.constraint(equalToConstant: 36).isActive = true
+        commands.spacing = 7; commands.heightAnchor.constraint(equalToConstant: 36).isActive = true
+        commands.setCustomSpacing(28, after: favorite)
+        commands.setCustomSpacing(4, after: iconSlider)
         let top = NSStackView(views: [navigation, commands])
         top.orientation = .vertical; top.alignment = .leading; top.spacing = 10
         top.heightAnchor.constraint(equalToConstant: 98).isActive = true
@@ -515,8 +517,10 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             column.width = max(70, view.columnWidths[column.identifier.rawValue] ?? defaultColumnWidth(column.identifier.rawValue))
         }
         icons.iconSize = min(160, max(32, view.iconSize))
+        icons.iconSpacing = min(40, max(0, view.iconSpacing ?? 10))
         icons.currentFolder = current
         iconSlider.doubleValue = Double(icons.iconSize)
+        spacingSlider.doubleValue = Double(icons.iconSpacing)
         updateFilePanePresentation()
         updateAncestorPathBar()
     }
@@ -549,6 +553,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     }
     private func updateSizeSliderVisibility() {
         iconSlider.isHidden = isSearching || folderView.mode != .icons
+        spacingSlider.isHidden = iconSlider.isHidden
     }
     private func saveView() { if !restoringView { viewStore.save(folderView, for: current) } }
     private func rebuildViewMenu() {
@@ -581,6 +586,10 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     @objc private func iconSizeChanged() {
         folderView.iconSize = iconSlider.doubleValue
         icons.iconSize = iconSlider.doubleValue; saveView()
+    }
+    @objc private func iconSpacingChanged() {
+        folderView.iconSpacing = spacingSlider.doubleValue
+        icons.iconSpacing = spacingSlider.doubleValue; saveView()
     }
     @objc private func makeViewDefault() {
         var defaults = folderView; defaults.filter = ""
@@ -1009,8 +1018,6 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     @objc private func appearanceChanged() {
         guard let window, let root = window.contentView else { return }
         root.effectiveAppearance.performAsCurrentDrawingAppearance {
-            window.isOpaque = false
-            window.backgroundColor = .clear
             BrowserTheme.paint(root, color: .clear)
             BrowserTheme.paint(topChrome, color: BrowserTheme.chrome)
             BrowserTheme.paint(titlebarChrome, color: BrowserTheme.titlebarTint.withAlphaComponent(BrowserTheme.titlebarOpacity))

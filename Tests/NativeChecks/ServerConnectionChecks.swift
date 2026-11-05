@@ -13,21 +13,25 @@ func checkServerConnections() throws {
     let browser = BrowserController()
     defer { browser.close() }
     let root = browser.window!.contentView!
-    guard let toolbarConnect = descendants(root).compactMap({ $0 as? NSButton }).first(where: { $0.title == "Connect to Server" }) else {
+    guard let toolbarConnect = descendants(root).compactMap({ $0 as? NSButton }).first(where: { $0.accessibilityLabel() == "Connect to Server" }) else {
         throw NativeCheckError.failed("Connect to Server must be directly visible on the toolbar")
     }
     for width in [900.0, 1120.0, 1400.0] {
         browser.window!.setContentSize(NSSize(width: width, height: 740))
         root.layoutSubtreeIfNeeded()
         let frame = toolbarConnect.convert(toolbarConnect.bounds, to: root)
-        try require(root.bounds.contains(frame) && frame.width >= toolbarConnect.intrinsicContentSize.width, "The complete server button must fit at every supported window width")
+        try require(root.bounds.contains(frame) && frame.size == NSSize(width: 30, height: 30) && toolbarConnect.imagePosition == .imageOnly, "Server connection must use one standard square toolbar icon")
         let path = descendants(root).compactMap { $0 as? NSTextField }.first { $0.accessibilityLabel() == "Current folder path" }!
         let search = descendants(root).compactMap { $0 as? NSTextField }.first { $0.accessibilityLabel() == "Search this folder" }!
-        try require(path.frame.width > 150 && search.convert(search.bounds, to: root).maxX < frame.minX, "Server access must not crowd out the path or overlap search")
+        let searchFrame = search.convert(search.bounds, to: root)
+        try require(path.frame.width > 150 && abs(searchFrame.maxX - (root.bounds.maxX - 20)) < 1, "Search must retain its original right-aligned position")
+        let favorite = descendants(root).compactMap { $0 as? NSButton }.first { $0.accessibilityLabel() == "Add selected folder to Favorites" }!
+        let favoriteFrame = favorite.convert(favorite.bounds, to: root)
+        try require(abs(frame.midY - favoriteFrame.midY) < 1 && frame.minX - favoriteFrame.maxX >= 24, "Server icon must sit to the right of Favorites with a clear gap")
     }
     toolbarConnect.performClick(nil)
     try require(delegate.connections == 1, "The toolbar button must open the app's connection dialog")
-    print("PASS: Visible Connect to Server toolbar action, full label at 900/1120/1400 widths, and path/search separation")
+    print("PASS: Server icon after Favorites with a clear gap at 900/1120/1400 widths, original Search position, and working action")
 
     for (input, expected) in [("server/share", "smb://server/share"), (" smb://server/Team Files ", "smb://server/Team%20Files"),
         ("afp://nas/share", "afp://nas/share"), ("nfs://nas/export", "nfs://nas/export"),

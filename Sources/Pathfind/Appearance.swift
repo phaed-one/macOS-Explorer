@@ -1,6 +1,12 @@
 import AppKit
 
 enum BrowserTheme {
+    static let appearancePreferenceKeys = ["frostedPanes", "paneOpacity", "glassTint", "glassFrosting", "titlebarTint", "titlebarOpacity", "titlebarTintEnabled", "accentColor", "windowOutlineEnabled", "windowOutlineColor"]
+    static func resetAppearance() {
+        for key in appearancePreferenceKeys { UserDefaults.standard.removeObject(forKey: key) }
+        initializeAccent()
+        NotificationCenter.default.post(name: changed, object: nil)
+    }
     static let changed = Notification.Name("PathfindAppearanceChanged")
     static var frosted: Bool { UserDefaults.standard.object(forKey: "frostedPanes") as? Bool ?? true }
     static var frosting: Double { min(1, max(0, UserDefaults.standard.double(forKey: "glassFrosting"))) }
@@ -235,6 +241,14 @@ final class WindowOutlineView: NSView {
 
 /// A custom-framed window keeps its outline under app control using public APIs.
 final class BrowserWindow: NSWindow {
+    override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
+        super.init(contentRect: contentRect, styleMask: style, backing: backingStoreType, defer: flag)
+        isOpaque = false; backgroundColor = .clear
+        // Explicitly opt the transparent custom frame into mouse input. The
+        // default value alone leaves transparent resize pixels click-through.
+        ignoresMouseEvents = false
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
     // perform* expects titlebar-owned buttons; the custom frame has none.

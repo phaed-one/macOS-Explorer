@@ -7,6 +7,8 @@ public enum FolderViewMode: String, Codable, Sendable {
 public struct FolderViewPreferences: Codable, Equatable, Sendable {
     public var mode: FolderViewMode = .icons
     public var iconSize: Double = 64
+    // Optional so existing saved views decode without losing their settings.
+    public var iconSpacing: Double? = nil
     public var sort: FileSort = .name
     public var ascending = true
     public var foldersFirst = true

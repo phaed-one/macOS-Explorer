@@ -16,6 +16,9 @@ final class SettingsController: NSWindowController {
     private let outlineColor = AnchoredColorWell()
     private let defaultManagerStatus = NSTextField(wrappingLabelWithString: "")
     private let defaultManagerButton = NSButton(title: "Use Explorer as Default", target: nil, action: nil)
+    private let glass = NSButton(checkboxWithTitle: "Liquid Glass pane backgrounds", target: nil, action: nil)
+    private let enableTitlebar = NSButton(checkboxWithTitle: "Enable titlebar tint", target: nil, action: nil)
+    private let enableOutline = NSButton(checkboxWithTitle: "Show window outline", target: nil, action: nil)
     init() {
         BrowserTheme.initializeAccent()
         let window = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 560, height: 570), styleMask: [.titled, .closable, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -34,25 +37,24 @@ final class SettingsController: NSWindowController {
         updateDefaultManagerStatus()
         let title = NSTextField(labelWithString: "Appearance")
         title.font = .systemFont(ofSize: 17, weight: .semibold)
-        let glass = NSButton(checkboxWithTitle: "Liquid Glass pane backgrounds", target: self, action: #selector(toggleGlass(_:)))
-        glass.state = BrowserTheme.frosted ? .on : .off
+        let reset = NSButton(title: "Reset to Defaults", target: self, action: #selector(resetToDefaults))
+        let appearanceHeading = NSStackView(views: [title, reset])
+        appearanceHeading.spacing = 20
+        glass.target = self; glass.action = #selector(toggleGlass(_:))
         let description = NSTextField(wrappingLabelWithString: "1% keeps the glass lightly tinted. 100% is fully opaque. Glass tint and Accent are independent.")
         description.textColor = .secondaryLabelColor
         opacity.target = self; opacity.action = #selector(opacityChanged)
         opacity.isContinuous = true; opacity.isEnabled = BrowserTheme.frosted
         opacity.setAccessibilityLabel("Pane opacity")
         opacity.widthAnchor.constraint(equalToConstant: 220).isActive = true
-        percentage.stringValue = "\(Int(BrowserTheme.opacity * 100))%"
         let opacityRow = NSStackView(views: [NSTextField(labelWithString: "Pane opacity"), opacity, percentage])
         frosting.target = self; frosting.action = #selector(frostingChanged)
         frosting.isContinuous = true; frosting.isEnabled = BrowserTheme.frosted
         frosting.setAccessibilityLabel("Glass frosting")
         frosting.widthAnchor.constraint(equalToConstant: 220).isActive = true
-        frostingAmount.stringValue = "\(Int(BrowserTheme.frosting * 100))%"
         let frostingRow = NSStackView(views: [NSTextField(labelWithString: "Frosting"), frosting, frostingAmount])
         let frostingHint = NSTextField(wrappingLabelWithString: "Clear → Frosted. Blends in native backdrop blur that stays active while you use the window. This is independent of tint opacity.")
         frostingHint.font = .systemFont(ofSize: 11); frostingHint.textColor = .secondaryLabelColor
-        tintColor.color = BrowserTheme.pane
         tintColor.target = self; tintColor.action = #selector(tintChanged)
         tintColor.setAccessibilityLabel("Glass tint color")
         tintColor.widthAnchor.constraint(equalToConstant: 50).isActive = true
@@ -61,9 +63,7 @@ final class SettingsController: NSWindowController {
         let tintRow = NSStackView(views: [NSTextField(labelWithString: "Glass tint"), tintColor, resetTint])
         let titlebarHeading = NSTextField(labelWithString: "Titlebar Tint")
         titlebarHeading.font = .systemFont(ofSize: 14, weight: .semibold)
-        let enableTitlebar = NSButton(checkboxWithTitle: "Enable titlebar tint", target: self, action: #selector(toggleTitlebarTint(_:)))
-        enableTitlebar.state = BrowserTheme.titlebarTintEnabled ? .on : .off
-        titlebarColor.color = BrowserTheme.titlebarTint
+        enableTitlebar.target = self; enableTitlebar.action = #selector(toggleTitlebarTint(_:))
         titlebarColor.target = self; titlebarColor.action = #selector(titlebarTintChanged)
         titlebarColor.setAccessibilityLabel("Titlebar tint color")
         titlebarColor.widthAnchor.constraint(equalToConstant: 50).isActive = true
@@ -74,12 +74,10 @@ final class SettingsController: NSWindowController {
         titlebarOpacity.isContinuous = true
         titlebarOpacity.setAccessibilityLabel("Titlebar tint opacity")
         titlebarOpacity.widthAnchor.constraint(equalToConstant: 220).isActive = true
-        titlebarPercentage.stringValue = "\(Int(BrowserTheme.titlebarOpacity * 100))%"
         let titlebarOpacityRow = NSStackView(views: [NSTextField(labelWithString: "Titlebar opacity"), titlebarOpacity, titlebarPercentage])
         updateTitlebarControls()
         let accentHeading = NSTextField(labelWithString: "Accent Color")
         accentHeading.font = .systemFont(ofSize: 14, weight: .semibold)
-        accentColor.color = BrowserTheme.accentColor
         accentColor.target = self; accentColor.action = #selector(accentChanged)
         accentColor.setAccessibilityLabel("Accent color")
         accentColor.widthAnchor.constraint(equalToConstant: 50).isActive = true
@@ -90,16 +88,14 @@ final class SettingsController: NSWindowController {
         accentHint.textColor = .secondaryLabelColor
         let outlineHeading = NSTextField(labelWithString: "Window Outline")
         outlineHeading.font = .systemFont(ofSize: 14, weight: .semibold)
-        let enableOutline = NSButton(checkboxWithTitle: "Show window outline", target: self, action: #selector(toggleOutline(_:)))
-        enableOutline.state = BrowserTheme.outlineEnabled ? .on : .off
-        outlineColor.color = BrowserTheme.outlineColor
+        enableOutline.target = self; enableOutline.action = #selector(toggleOutline(_:))
         outlineColor.target = self; outlineColor.action = #selector(outlineColorChanged)
         outlineColor.isEnabled = BrowserTheme.outlineEnabled
         outlineColor.setAccessibilityLabel("Window outline color")
         outlineColor.widthAnchor.constraint(equalToConstant: 50).isActive = true
         outlineColor.heightAnchor.constraint(equalToConstant: 26).isActive = true
         let outlineRow = NSStackView(views: [NSTextField(labelWithString: "Outline color"), outlineColor])
-        let stack = NSStackView(views: [updates, managerTitle, defaultManagerStatus, managerButtons, managerHint, title, glass, opacityRow, frostingRow, frostingHint, tintRow, description, titlebarHeading, enableTitlebar, titlebarTintRow, titlebarOpacityRow, accentHeading, accentRow, accentHint, outlineHeading, enableOutline, outlineRow])
+        let stack = NSStackView(views: [updates, managerTitle, defaultManagerStatus, managerButtons, managerHint, appearanceHeading, glass, opacityRow, frostingRow, frostingHint, tintRow, description, titlebarHeading, enableTitlebar, titlebarTintRow, titlebarOpacityRow, accentHeading, accentRow, accentHint, outlineHeading, enableOutline, outlineRow])
         stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 18
         stack.translatesAutoresizingMaskIntoConstraints = false
         let scroll = BrowserScrollView(frame: window.contentView!.bounds)
@@ -119,8 +115,31 @@ final class SettingsController: NSWindowController {
         document.layoutSubtreeIfNeeded()
         document.setFrameSize(NSSize(width: document.frame.width, height: max(scroll.contentSize.height, stack.fittingSize.height + 48)))
         window.center()
+        syncAppearanceControls()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    @objc private func resetToDefaults() {
+        for well in [tintColor, titlebarColor, accentColor, outlineColor] { well.deactivate() }
+        NSColorPanel.shared.orderOut(nil)
+        BrowserTheme.resetAppearance()
+        syncAppearanceControls()
+    }
+    private func syncAppearanceControls() {
+        glass.state = BrowserTheme.frosted ? .on : .off
+        opacity.doubleValue = BrowserTheme.opacity; opacity.isEnabled = BrowserTheme.frosted
+        percentage.stringValue = "\(Int(BrowserTheme.opacity * 100))%"
+        frosting.doubleValue = BrowserTheme.frosting; frosting.isEnabled = BrowserTheme.frosted
+        frostingAmount.stringValue = "\(Int(BrowserTheme.frosting * 100))%"
+        tintColor.color = BrowserTheme.pane
+        enableTitlebar.state = BrowserTheme.titlebarTintEnabled ? .on : .off
+        titlebarColor.color = BrowserTheme.titlebarTint
+        titlebarOpacity.doubleValue = BrowserTheme.titlebarOpacity
+        titlebarPercentage.stringValue = "\(Int(BrowserTheme.titlebarOpacity * 100))%"
+        updateTitlebarControls()
+        accentColor.color = BrowserTheme.accentColor
+        enableOutline.state = BrowserTheme.outlineEnabled ? .on : .off
+        outlineColor.color = BrowserTheme.outlineColor; outlineColor.isEnabled = BrowserTheme.outlineEnabled
+    }
     private func updateDefaultManagerStatus() {
         let active = DefaultFileManager.isDefault
         defaultManagerStatus.stringValue = active ? "Explorer is your default file manager." : "Explorer is not your default file manager."

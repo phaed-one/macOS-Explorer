@@ -7,9 +7,17 @@ final class AncestorPathBar: NSView {
     private let content = NSView()
     private var locations: [URL] = []
     private var buttons: [NSButton] = []
+    private let parentButton = NSButton()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
+        parentButton.image = NSImage(systemSymbolName: "chevron.left", accessibilityDescription: nil)
+        parentButton.imagePosition = .imageOnly; parentButton.bezelStyle = .rounded
+        parentButton.target = self; parentButton.action = #selector(openParent)
+        parentButton.setAccessibilityLabel("Go to parent folder")
+        ToolbarHelp.install(on: parentButton, text: "Parent folder (⌘↑)")
+        parentButton.isEnabled = false
+        addSubview(parentButton)
         scroll.drawsBackground = false
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
@@ -22,6 +30,7 @@ final class AncestorPathBar: NSView {
 
     func update(_ ancestors: [URL]) {
         locations = ancestors
+        parentButton.isEnabled = !ancestors.isEmpty
         buttons.forEach { $0.removeFromSuperview() }
         buttons = ancestors.enumerated().map { index, location in
             let title = location == TrashStore.location ? "Trash" : location.path == "/" ? "/" : location.lastPathComponent
@@ -41,7 +50,8 @@ final class AncestorPathBar: NSView {
 
     override func layout() {
         super.layout()
-        scroll.frame = NSRect(x: 12, y: 0, width: max(0, bounds.width - 24), height: bounds.height)
+        parentButton.frame = NSRect(x: 12, y: (bounds.height - 26) / 2, width: 28, height: 26)
+        scroll.frame = NSRect(x: 45, y: 0, width: max(0, bounds.width - 57), height: bounds.height)
         var x: CGFloat = 0
         for button in buttons {
             button.sizeToFit()
@@ -55,5 +65,9 @@ final class AncestorPathBar: NSView {
     @objc private func openAncestor(_ sender: NSButton) {
         guard locations.indices.contains(sender.tag) else { return }
         onNavigate?(locations[sender.tag])
+    }
+    @objc private func openParent() {
+        guard let parent = locations.last else { return }
+        onNavigate?(parent)
     }
 }

@@ -49,6 +49,7 @@ func checkFavoriteAndVisibilityControls() throws {
     mode.selectedSegment = 1; mode.sendAction(mode.action, to: mode.target)
     browser.window!.contentView!.layoutSubtreeIfNeeded()
     let ancestorBar = all.compactMap { $0 as? AncestorPathBar }.first!
+    let up = descendants(ancestorBar).compactMap { $0 as? NSButton }.first { $0.accessibilityLabel() == "Go to parent folder" }!
     func ancestorButtons() -> [NSButton] { descendants(ancestorBar).compactMap { $0 as? NSButton }.filter { $0.accessibilityLabel()?.hasPrefix("Go to ancestor folder:") == true } }
     let parentButton = ancestorButtons().last!
     try require(ancestorButtons().first?.title == "/" && parentButton.title == root.lastPathComponent && ancestorButtons().allSatisfy { $0.image == nil && $0.bezelColor == nil }, "Details must show neutral ancestor buttons from root to parent without arrows")
@@ -56,6 +57,9 @@ func checkFavoriteAndVisibilityControls() throws {
     let removedActions = ["goBack", "goForward", "goUp", "refresh"].map(NSSelectorFromString)
     try require(!all.compactMap { $0 as? NSButton }.contains { $0.action.map(removedActions.contains) == true }, "Back, Forward, Up, and Refresh buttons must be absent from the toolbar")
     let parentFrame = parentButton.convert(parentButton.bounds, to: browser.window!.contentView!)
+    let upFrame = up.convert(up.bounds, to: ancestorBar)
+    let rootFrame = ancestorButtons().first!.convert(ancestorButtons().first!.bounds, to: ancestorBar)
+    try require(up.image != nil && up.isEnabled && upFrame.maxX < rootFrame.minX, "Parent chevron must precede the root path button")
     let columnFrame = table.headerView!.convert(table.headerView!.bounds, to: browser.window!.contentView!)
     try require(parentFrame.minY > columnFrame.maxY, "The parent button must sit in reserved space above the column headers")
     let star = all.compactMap { $0 as? NSButton }.first { $0.action == NSSelectorFromString("toggleSelectedFavorite") }!
@@ -96,7 +100,7 @@ func checkFavoriteAndVisibilityControls() throws {
     try waitUntil { browser.window?.representedURL == b && table.numberOfRows == 1 }
     try require(localEye.state == .off, "Showing hidden files in A must not affect B")
     try require(ancestorButtons().last?.title == a.lastPathComponent, "The ancestor buttons must follow navigation")
-    ancestorButtons().last!.performClick(nil)
+    up.performClick(nil)
     try waitUntil { browser.window?.representedURL?.path == a.path }
     browser.navigate(a)
     try waitUntil { browser.window?.representedURL == a && table.numberOfRows == 3 }
@@ -127,5 +131,8 @@ func checkFavoriteAndVisibilityControls() throws {
     try require(Date().timeIntervalSince(start) >= 0.95, "Tooltips must wait one second")
     hover.endHover()
     try require(!HelpPopup.shared.isVisible, "Leaving a control must dismiss its tooltip")
+    browser.navigate(URL(fileURLWithPath: "/"))
+    try waitUntil { browser.window?.representedURL?.path == "/" }
+    try require(!up.isEnabled && ancestorButtons().isEmpty, "Parent navigation must be disabled at the filesystem root")
     print("PASS: Favorite states, per-folder visibility, ancestor navigation in both views, simplified toolbar, and one-second tooltips")
 }

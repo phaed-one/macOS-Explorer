@@ -236,7 +236,8 @@ do {
     let pressedColor = NSBitmapImageRep(data: pressedImage.tiffRepresentation!)!.colorAt(x: 15, y: 15)!.usingColorSpace(.sRGB)!
     try require(pressedColor.redComponent > referenceColor.redComponent && pressedColor.blueComponent > referenceColor.blueComponent, "Pressed buttons must draw a lighter Accent fill")
     print("PASS: Inactive selection rendering uses Accent and pressed buttons use a lighter Accent")
-    try require(!window.styleMask.contains(.titled) && window.styleMask.contains(.resizable) && window.canBecomeKey && window.canBecomeMain, "Custom outline must retain key-window and resizing behavior")
+    try require(!window.styleMask.contains(.titled) && window.styleMask.contains(.resizable) && window.canBecomeKey && window.canBecomeMain, "Custom outline must retain key-window eligibility and the resize style")
+    try checkWindowResizeInput()
     let outlineToggle = descendants(settings.window!.contentView!).compactMap { $0 as? NSButton }.first { $0.title == "Show window outline" }!
     outlineToggle.state = .on; outlineToggle.performClick(nil)
     try require(!BrowserTheme.outlineEnabled && descendants(window.contentView!).compactMap { $0 as? WindowOutlineView }.allSatisfy(\.isHidden), "Disabling the outline must hide the only window stroke")
@@ -324,6 +325,7 @@ do {
     try MainActor.assumeIsolated { try checkUpdateInterface() }
     try checkDiskAccessOnboarding()
     try checkServerConnections()
+    try checkIconSpacing()
     try checkFolderDropsAddFavorites()
     try checkNameConflictPrompts()
     try checkLiveFolderUpdates()
@@ -331,6 +333,7 @@ do {
     try checkSearchAndHeaderFocus()
     try checkMomentaryButtonHighlight()
     try checkHalfThicknessScrollbars()
+    try checkSettingsReset()
     let volume = URL(fileURLWithPath: "/Volumes/Pathfind-QA")
     if FileManager.default.fileExists(atPath: volume.appendingPathComponent("FOLDER1").path) {
         defaults.set([], forKey: "explicitExpandedTreePaths")
