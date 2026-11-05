@@ -10,7 +10,7 @@
 
 ![macOS Explorer in dark mode](docs/screenshot-dark.webp)
 
-![macOS Explorer in light mode](docs/screenshot-light.webp)
+![macOS Explorer in light mode](docs/screenshot-light-2.webp)
 
 ![Explorer Settings over the main window](docs/screenshot-settings.webp)
 
