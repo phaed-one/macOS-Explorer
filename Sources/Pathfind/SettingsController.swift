@@ -13,6 +13,15 @@ final class SettingsController: NSWindowController {
     private let titlebarPercentage = NSTextField(labelWithString: "")
     private let resetTitlebarButton = NSButton(title: "Reset", target: nil, action: nil)
     private let outlineColor = AnchoredColorWell()
+    private let restoreFrame = NSButton(checkboxWithTitle: "Restore size and position", target: nil, action: nil)
+    private let restoreTabs = NSButton(checkboxWithTitle: "Restore open tabs", target: nil, action: nil)
+    private let startupFolder = NSPopUpButton(frame: .zero, pullsDown: false)
+    private static let startupFolders: [(String, URL?)] = {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        return [("Last opened folder", nil), ("Home", home), ("Applications", URL(fileURLWithPath: "/Applications")),
+                ("Desktop", home.appendingPathComponent("Desktop")), ("Documents", home.appendingPathComponent("Documents")),
+                ("Downloads", home.appendingPathComponent("Downloads"))]
+    }()
     private let themeMode = NSSegmentedControl(labels: ["Light", "Dark"], trackingMode: .selectOne, target: nil, action: nil)
     private let chromeColor = AnchoredColorWell()
     private let defaultManagerStatus = NSTextField(wrappingLabelWithString: "")
@@ -64,10 +73,27 @@ final class SettingsController: NSWindowController {
         themeGrid.column(at: 0).width = 52
         for index in 0..<themeGrid.numberOfRows { themeGrid.row(at: index).yPlacement = .center }
         let themeHint = Self.hint("Toolbar band and selected tab, saved for each mode.", width: inner)
-        let themeCard = SettingsCard(title: "Theme", width: Self.columnWidth, content: [themeGrid, themeHint])
-        let general = NSStackView(views: [SettingsCard(title: nil, width: Self.columnWidth, content: [updates]), themeCard, finderCard])
-        general.orientation = .vertical; general.alignment = .leading; general.spacing = 16
-        general.distribution = .fill
+        let themeCard = SettingsCard(title: "Theme", width: Self.columnWidth, fillsHeight: true, content: [themeGrid, themeHint])
+        // Startup: what Explorer brings back when it opens.
+        restoreFrame.target = self; restoreFrame.action = #selector(startupOptionChanged(_:))
+        restoreTabs.target = self; restoreTabs.action = #selector(startupOptionChanged(_:))
+        startupFolder.target = self; startupFolder.action = #selector(startupFolderChanged)
+        startupFolder.setAccessibilityLabel("Startup folder")
+        rebuildStartupFolderMenu()
+        let startupGrid = NSGridView(views: [[Self.rowLabel("Window"), restoreFrame], [Self.rowLabel("Tabs"), restoreTabs],
+                                             [Self.rowLabel("Folder"), startupFolder]])
+        startupGrid.rowSpacing = 8; startupGrid.columnSpacing = 12
+        startupGrid.column(at: 0).xPlacement = .trailing
+        startupGrid.column(at: 0).width = 52
+        for index in 0..<startupGrid.numberOfRows { startupGrid.row(at: index).yPlacement = .center }
+        let startupCard = SettingsCard(title: "Startup", width: Self.columnWidth, content: [startupGrid])
+        // Three columns keep Settings wide and short: app, behavior, then appearance.
+        let general = NSStackView(views: [SettingsCard(title: nil, width: Self.columnWidth, content: [updates]), themeCard])
+        let behavior = NSStackView(views: [startupCard, finderCard])
+        for column in [general, behavior] {
+            column.orientation = .vertical; column.alignment = .leading; column.spacing = 16
+            column.distribution = .fill
+        }
         updateDefaultManagerStatus()
 
         // Right column: how Explorer looks.
@@ -145,7 +171,7 @@ final class SettingsController: NSWindowController {
         let reset = NSButton(title: "Reset to Defaults", target: self, action: #selector(resetToDefaults))
         let appearance = SettingsCard(title: "Appearance", accessory: reset, width: Self.appearanceWidth, fillsHeight: true, content: [grid])
 
-        let columns = NSStackView(views: [general, appearance])
+        let columns = NSStackView(views: [general, behavior, appearance])
         columns.orientation = .horizontal; columns.alignment = .top; columns.spacing = 20
         columns.edgeInsets = NSEdgeInsets(top: 8, left: 24, bottom: 24, right: 24)
         columns.translatesAutoresizingMaskIntoConstraints = false
@@ -153,7 +179,8 @@ final class SettingsController: NSWindowController {
         content.addSubview(columns)
         NSLayoutConstraint.activate([columns.topAnchor.constraint(equalTo: content.topAnchor),
                                      columns.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-                                     general.heightAnchor.constraint(equalTo: appearance.heightAnchor)])
+                                     general.heightAnchor.constraint(equalTo: appearance.heightAnchor),
+                                     behavior.heightAnchor.constraint(equalTo: appearance.heightAnchor)])
         syncAppearanceControls()
         window.setContentSize(columns.fittingSize)
         window.center()
@@ -191,6 +218,8 @@ final class SettingsController: NSWindowController {
         syncAppearanceControls()
     }
     private func syncAppearanceControls() {
+        restoreFrame.state = StartupPreferences.restoresFrame ? .on : .off
+        restoreTabs.state = StartupPreferences.restoresTabs ? .on : .off
         themeMode.selectedSegment = BrowserTheme.darkMode ? 1 : 0
         chromeColor.color = BrowserTheme.chromeColor(dark: BrowserTheme.darkMode)
         glass.state = BrowserTheme.frosted ? .on : .off
@@ -306,6 +335,50 @@ final class SettingsController: NSWindowController {
     @objc private func useTitlebarAccent() {
         accentColor.color = BrowserTheme.titlebarTint
         accentChanged()
+    }
+    /// Lists the preset startup folders, plus a chosen one when it isn't a preset.
+    private func rebuildStartupFolderMenu() {
+        let menu = NSMenu()
+        let chosen = StartupPreferences.folder?.standardizedFileURL
+        var selected: NSMenuItem?
+        for (index, (title, url)) in Self.startupFolders.enumerated() {
+            if index == 1 { menu.addItem(.separator()) }
+            let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            item.representedObject = url
+            menu.addItem(item)
+            if url?.standardizedFileURL == chosen { selected = item }
+        }
+        if let chosen, selected == nil {
+            let item = NSMenuItem(title: chosen.lastPathComponent, action: nil, keyEquivalent: "")
+            item.representedObject = chosen; item.toolTip = chosen.path
+            menu.addItem(item); selected = item
+        }
+        menu.addItem(.separator())
+        let choose = NSMenuItem(title: "Choose…", action: nil, keyEquivalent: "")
+        choose.identifier = NSUserInterfaceItemIdentifier("chooseStartupFolder")
+        menu.addItem(choose)
+        startupFolder.menu = menu
+        startupFolder.select(selected ?? menu.items.first)
+    }
+    @objc private func startupOptionChanged(_ sender: NSButton) {
+        UserDefaults.standard.set(sender.state == .on, forKey: sender === restoreFrame ? "startupRestoresFrame" : "startupRestoresTabs")
+    }
+    @objc private func startupFolderChanged() {
+        guard let item = startupFolder.selectedItem else { return }
+        if item.identifier?.rawValue == "chooseStartupFolder" {
+            let panel = NSOpenPanel()
+            panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.allowsMultipleSelection = false
+            panel.prompt = "Open at Startup"
+            panel.directoryURL = StartupPreferences.folder ?? FileManager.default.homeDirectoryForCurrentUser
+            let finish: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+                if response == .OK, let url = panel.url { UserDefaults.standard.set(url.path, forKey: "startupFolder") }
+                self?.rebuildStartupFolderMenu()
+            }
+            if let window { panel.beginSheetModal(for: window, completionHandler: finish) } else { finish(panel.runModal()) }
+            return
+        }
+        if let url = item.representedObject as? URL { UserDefaults.standard.set(url.path, forKey: "startupFolder") }
+        else { UserDefaults.standard.removeObject(forKey: "startupFolder") }
     }
     @objc private func toggleFieldTint(_ sender: NSButton) {
         BrowserTheme.setThemed(sender.state == .on, forKey: "fieldTintEnabled")

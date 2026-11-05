@@ -1,6 +1,22 @@
 import AppKit
 import PathfindCore
 
+/// How Explorer opens at launch, and when the Dock icon reopens a closed window.
+enum StartupPreferences {
+    static var restoresFrame: Bool { UserDefaults.standard.object(forKey: "startupRestoresFrame") as? Bool ?? true }
+    static var restoresTabs: Bool { UserDefaults.standard.object(forKey: "startupRestoresTabs") as? Bool ?? true }
+    /// The folder the active tab opens in; nil keeps the last opened folder.
+    static var folder: URL? { UserDefaults.standard.string(forKey: "startupFolder").map { URL(fileURLWithPath: $0) } }
+    static func tabs(from saved: BrowserTabs) -> BrowserTabs {
+        var tabs = restoresTabs ? saved : BrowserTabs(tab: saved.current)
+        if let folder, FileManager.default.fileExists(atPath: folder.path) {
+            tabs.current.url = folder; tabs.current.history.visit(folder)
+            tabs.current.selection = nil; tabs.current.scrollOffset = nil
+        }
+        return tabs
+    }
+}
+
 /// The sole owner of open windows, tab transfers, and their persisted session.
 final class BrowserWorkspace: NSObject, NSWindowDelegate {
     private struct SavedWindow: Codable { let id: UUID; let tabs: BrowserTabs; let frame: String }
@@ -20,15 +36,20 @@ final class BrowserWorkspace: NSObject, NSWindowDelegate {
         restoring = true
         let saved = defaults.data(forKey: "browserWorkspace").flatMap { try? JSONDecoder().decode(Session.self, from: $0) }
         lastClosed = saved?.lastClosed
-        for record in saved?.windows ?? [] where !record.tabs.items.isEmpty {
-            let browser = create(tabs: record.tabs, id: record.id)
+        var records = (saved?.windows ?? []).filter { !$0.tabs.items.isEmpty }
+        // Without tab restore, only the most recently used window comes back, with its active tab.
+        if !StartupPreferences.restoresTabs, let last = records.last { records = [last] }
+        for record in records {
+            let browser = create(tabs: StartupPreferences.tabs(from: record.tabs), id: record.id)
             let frame = NSRectFromString(record.frame)
-            if frame.width >= 900, frame.height >= 440, let window = browser.window { place(window, frame: frame) }
+            if StartupPreferences.restoresFrame, frame.width >= 900, frame.height >= 440, let window = browser.window { place(window, frame: frame) }
         }
         if browsers.isEmpty {
             if let lastClosed {
-                let browser = create(tabs: lastClosed.tabs, id: lastClosed.id)
-                if let window = browser.window { place(window, frame: NSRectFromString(lastClosed.frame)) }
+                let browser = create(tabs: StartupPreferences.tabs(from: lastClosed.tabs), id: lastClosed.id)
+                if StartupPreferences.restoresFrame, let window = browser.window { place(window, frame: NSRectFromString(lastClosed.frame)) }
+            } else if let folder = StartupPreferences.folder {
+                create(tabs: BrowserTabs(url: folder))
             } else {
                 let id = UUID()
                 for key in Self.treeKeys {
@@ -42,10 +63,10 @@ final class BrowserWorkspace: NSObject, NSWindowDelegate {
     }
     /// Clicking the Dock icon with no windows brings back the last closed one exactly as it was.
     @discardableResult func reopenLastClosed() -> BrowserController {
-        guard let saved = lastClosed, !saved.tabs.items.isEmpty else { return newWindow() }
+        guard let saved = lastClosed, !saved.tabs.items.isEmpty else { return newWindow(at: StartupPreferences.folder) }
         lastClosed = nil
-        let browser = create(tabs: saved.tabs, id: saved.id)
-        if let window = browser.window { place(window, frame: NSRectFromString(saved.frame)) }
+        let browser = create(tabs: StartupPreferences.tabs(from: saved.tabs), id: saved.id)
+        if StartupPreferences.restoresFrame, let window = browser.window { place(window, frame: NSRectFromString(saved.frame)) }
         save()
         return browser
     }

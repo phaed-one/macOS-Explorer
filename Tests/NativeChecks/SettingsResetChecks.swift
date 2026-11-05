@@ -37,7 +37,7 @@ func checkSettingsReset() throws {
         "Resetting appearance must preserve favorites, folder views and the system file-manager choice")
     print("PASS: Reset to Defaults restores appearance immediately while preserving favorites, folder views and system choices")
     let frame = settings.window!.frame.size
-    try require(frame.width > frame.height * 1.25, "Settings must be a wide window: \(frame)")
+    try require(frame.width > frame.height * 1.6, "Settings must be a wide window: \(frame)")
     try require(!controls.contains { $0 is NSScrollView }, "Every setting must be visible without scrolling")
     let glass = checkboxes.first { $0.title == "Liquid Glass backgrounds" }!
     let opacityLabel = controls.compactMap { $0 as? NSTextField }.first { $0.stringValue == "Opacity" }!

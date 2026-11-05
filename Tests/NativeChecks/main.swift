@@ -348,6 +348,7 @@ do {
     try checkThemeMode()
     try checkDialogAppearance()
     try checkWindowReopenRestoresState()
+    try checkStartupPreferences()
     try checkBrowserEdgeResizing()
     let volume = URL(fileURLWithPath: "/Volumes/Pathfind-QA")
     if FileManager.default.fileExists(atPath: volume.appendingPathComponent("FOLDER1").path) {

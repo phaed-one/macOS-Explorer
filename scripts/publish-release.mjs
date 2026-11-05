@@ -44,6 +44,8 @@ const body = `### What’s new
 
 - **Reopens exactly as you left it:** Closing the last window and clicking the Dock icon brings that window back with its size, position, tabs, sidebar divider and folder tree. Each tab also remembers its selected items, scroll position and search, after quitting too.
 - **Sidebar keeps its width:** Resizing the window no longer stretches the sidebar.
+- **Startup options:** In Settings → Startup, choose whether Explorer restores window size and position and open tabs, and whether it opens the last folder or one you pick.
+- **Wider Settings:** Settings now has three columns, so every option fits without a tall window.
 - **Field color:** Tint the path and search fields with a color you pick in Settings → Highlights, saved separately for light and dark. The tint now shows while the window is active and follows theme switches.
 - **New light-mode defaults:** Smoke glass, a grey titlebar at 60% and light grey fields.
 - **Readable selection in light mode:** A selection in an inactive pane is now light, so its text stays readable.
