@@ -14,7 +14,14 @@ enum FileTransfer {
     static func accept(_ info: NSDraggingInfo, destination: URL, perform: (([URL], URL, Bool) -> Void)?) -> Bool {
         let operation = dragOperation(info)
         guard !operation.isEmpty, let perform else { return false }
-        perform(urls(info), destination, operation == .move)
+        let folder = destination.resolvingSymlinksInPath().standardizedFileURL
+        let sources = urls(info).filter { url in
+            let source = url.resolvingSymlinksInPath().standardizedFileURL
+            let parent = url.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL
+            return source.path != folder.path && parent.path != folder.path
+        }
+        // Dropping an item on itself or back into its own folder is a no-op.
+        if !sources.isEmpty { perform(sources, destination, operation == .move) }
         return true
     }
     static func trackRightMouse(in view: NSView, event: NSEvent, beginDrag: (NSEvent) -> Void) {

@@ -130,7 +130,9 @@ private final class FileIconItem: NSCollectionViewItem {
         updateSelection()
     }
     override var isSelected: Bool { didSet { updateSelection() } }
+    override var highlightState: NSCollectionViewItem.HighlightState { didSet { updateSelection() } }
     private func updateSelection() {
-        view.layer?.backgroundColor = (isSelected ? NSColor.selectedContentBackgroundColor.withAlphaComponent(0.45) : .clear).cgColor
+        let highlighted = highlightState == .forSelection || (isSelected && highlightState != .forDeselection)
+        view.layer?.backgroundColor = (highlighted ? NSColor.selectedContentBackgroundColor.withAlphaComponent(0.45) : .clear).cgColor
     }
 }

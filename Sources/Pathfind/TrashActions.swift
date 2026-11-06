@@ -31,6 +31,7 @@ final class TrashActions {
         }
     }
     func clear(on window: NSWindow, perform: @escaping Perform) {
+        guard ConfirmationPreference.clearTrash.isEnabled else { perform { try self.store.clear() }; return }
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "Clear Trash?"

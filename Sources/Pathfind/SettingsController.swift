@@ -79,10 +79,18 @@ final class SettingsController: NSWindowController {
         startupGrid.column(at: 0).width = 52
         for index in 0..<startupGrid.numberOfRows { startupGrid.row(at: index).yPlacement = .center }
         let startupCard = SettingsCard(title: "Startup", width: Self.columnWidth, content: [startupGrid])
+        let confirmations = ConfirmationPreference.allCases.map { preference in
+            let button = NSButton(checkboxWithTitle: preference.title, target: self, action: #selector(confirmationChanged(_:)))
+            button.identifier = NSUserInterfaceItemIdentifier(preference.rawValue)
+            button.state = preference.isEnabled ? .on : .off
+            return button
+        }
+        let confirmationCard = SettingsCard(title: "Confirmations", width: Self.columnWidth, content: confirmations + [
+            Self.hint("Clearing Trash permanently deletes its contents.", width: inner)])
         let finderCard = SettingsCard(title: "Show in Finder", width: Self.columnWidth, fillsHeight: true, content: [
             defaultManagerStatus, NSStackView(views: [defaultManagerButton, restoreFinderButton]), managerHint])
         // Left column: what Explorer does. Right column: how it looks, per theme.
-        let general = NSStackView(views: [SettingsCard(title: nil, width: Self.columnWidth, content: [updates]), startupCard, finderCard])
+        let general = NSStackView(views: [SettingsCard(title: nil, width: Self.columnWidth, content: [updates]), startupCard, confirmationCard, finderCard])
         general.orientation = .vertical; general.alignment = .leading; general.spacing = 16
         general.distribution = .fill
         updateDefaultManagerStatus()
@@ -206,6 +214,10 @@ final class SettingsController: NSWindowController {
         return row
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    @objc private func confirmationChanged(_ sender: NSButton) {
+        guard let key = sender.identifier?.rawValue, let preference = ConfirmationPreference(rawValue: key) else { return }
+        preference.isEnabled = sender.state == .on
+    }
     @objc private func resetToDefaults() {
         for well in [tintColor, titlebarColor, accentColor, outlineColor, chromeColor, fieldTintColor] { well.deactivate() }
         NSColorPanel.shared.orderOut(nil)

@@ -42,10 +42,9 @@ const terminals = [...source.matchAll(/case \.\w+: return "([^"]+)"/g)].map(matc
 if (terminals.length !== 14) throw new Error('Review the terminal catalog before publishing release notes');
 const body = `### What’s new
 
-- **Theme moved into Appearance:** The Light/Dark switch and header color now sit at the top of Appearance, since every setting there is saved per theme.
-- **Two-column Settings:** Updates, Startup and Show in Finder on the left; Appearance on the right.
-- **Startup options:** In Settings → Startup, choose whether Explorer restores window size and position and open tabs, and whether it opens the last folder or one you pick.
-- **Reopens exactly as you left it:** Closing the last window and clicking the Dock icon brings it back with its size, position, tabs, divider and folder tree. Each tab remembers its selection, scroll position and search.
+- **Live selection:** Files turn blue while you drag a selection rectangle, and clear as the rectangle moves away.
+- **Confirmation settings:** Settings → Confirmations lets you independently turn off prompts for moving items to Trash and clearing Trash. Both start enabled.
+- **Same-folder drops:** Dropping items onto themselves or their current folder now does nothing, without a warning.
 
 ### Updates
 

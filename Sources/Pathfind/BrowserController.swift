@@ -961,13 +961,15 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         if isTrashBrowsing { restoreTrashSelection(); return }
         let urls = selection.map(\.url)
         guard !urls.isEmpty, let window else { return }
+        let moveToTrash = { self.performFileOperation { for url in urls { try self.trashStore.trash(url) } } }
+        guard ConfirmationPreference.moveToTrash.isEnabled else { moveToTrash(); return }
         let alert = NSAlert()
         alert.messageText = "Move \(urls.count) item\(urls.count == 1 ? "" : "s") to the Trash?"
         alert.informativeText = "You can restore these items from the Trash."
         alert.addButton(withTitle: "Move to Trash"); alert.addButton(withTitle: "Cancel")
         alert.beginGlassSheetModal(for: window) { response in
             guard response == .alertFirstButtonReturn else { return }
-            self.performFileOperation { for url in urls { try self.trashStore.trash(url) } }
+            moveToTrash()
         }
     }
     private func prompt(_ title: String, value: String, completion: @escaping (String) -> Void) {
