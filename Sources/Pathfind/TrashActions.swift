@@ -6,6 +6,41 @@ final class TrashActions {
     private let store: TrashStore
     init(store: TrashStore) { self.store = store }
     typealias Perform = (@escaping () throws -> Void) -> Void
+
+    func moveToTrash(_ url: URL) throws {
+        try quitRunningApp(at: url)
+        try store.trash(url)
+    }
+
+    // Runs on the file-operation queue so the main run loop can receive termination updates.
+    private func quitRunningApp(at url: URL) throws {
+        guard url.pathExtension.lowercased() == "app",
+              let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+              values.isDirectory == true, values.isSymbolicLink != true else { return }
+
+        let path = url.resolvingSymlinksInPath().path
+        let running = NSWorkspace.shared.runningApplications.filter {
+            !$0.isTerminated && $0.bundleURL?.resolvingSymlinksInPath().path == path
+        }
+        guard !running.isEmpty else { return }
+        guard !running.contains(NSRunningApplication.current) else {
+            throw NSError(domain: "Pathfind", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "Quit Explorer and use Finder to move this copy of Explorer to the Trash."
+            ])
+        }
+
+        running.forEach { _ = $0.terminate() }
+        let deadline = ProcessInfo.processInfo.systemUptime + 30
+        while running.contains(where: { !$0.isTerminated }) {
+            guard ProcessInfo.processInfo.systemUptime < deadline else {
+                throw NSError(domain: "Pathfind", code: 1, userInfo: [
+                    NSLocalizedDescriptionKey: "“\(url.lastPathComponent)” is still running. Quit it and try moving it to the Trash again."
+                ])
+            }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+    }
+
     func restore(_ urls: [URL], on window: NSWindow, perform: @escaping Perform) {
         guard !urls.isEmpty else { return }
         DispatchQueue.global(qos: .userInitiated).async {

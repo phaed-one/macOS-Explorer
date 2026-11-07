@@ -872,7 +872,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         }
     }
     private func transferOne(_ url: URL, into destination: URL, move: Bool, conflict: NameConflict) throws {
-        if destination == TrashStore.location { try trashStore.trash(url); return }
+        if destination == TrashStore.location { try trashActions.moveToTrash(url); return }
         try FileSystem.transfer(url, into: destination, move: move, conflict: conflict) { _ = try self.trashStore.trash($0) }
     }
     /// Asks, like Finder, what to do with each name already in the destination. Skipped items are left out
@@ -966,7 +966,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         if isTrashBrowsing { restoreTrashSelection(); return }
         let urls = selection.map(\.url)
         guard !urls.isEmpty, let window else { return }
-        let moveToTrash = { self.performFileOperation { for url in urls { try self.trashStore.trash(url) } } }
+        let moveToTrash = { self.performFileOperation { for url in urls { try self.trashActions.moveToTrash(url) } } }
         guard ConfirmationPreference.moveToTrash.isEnabled else { moveToTrash(); return }
         let alert = NSAlert()
         alert.messageText = "Move \(urls.count) item\(urls.count == 1 ? "" : "s") to the Trash?"
