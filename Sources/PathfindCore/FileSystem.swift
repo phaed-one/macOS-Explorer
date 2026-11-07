@@ -12,6 +12,11 @@ public struct FileEntry: Sendable {
         self.size = size; self.modified = modified; self.kind = kind
     }
     public var name: String { url.lastPathComponent }
+    public var isBrowsableFolder: Bool {
+        guard isDirectory else { return false }
+        let target = url.resolvingSymlinksInPath()
+        return (try? target.resourceValues(forKeys: [.isPackageKey]).isPackage) != true
+    }
 }
 
 public enum FileSort: String, CaseIterable, Sendable, Codable {

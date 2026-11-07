@@ -36,6 +36,19 @@ func checkSymlinks() throws {
         try expect(try FileSystem.contents(of: root, showHidden: false).first { $0.name == "link" }?.isDirectory == true, "Directory symlink traversal")
     }
 }
+func checkBrowsableFolders() throws {
+    try fixture { root in
+        let app = root.appendingPathComponent("Example.app")
+        let folder = root.appendingPathComponent("Example.folder")
+        try FileManager.default.createDirectory(at: app, withIntermediateDirectories: false)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("App Link"), withDestinationURL: app)
+
+        let entries = try FileSystem.contents(of: root, showHidden: false)
+        try expect(entries.first { $0.name == app.lastPathComponent }?.isDirectory == true, "App bundles retain their filesystem directory status")
+        try expect(entries.filter(\.isBrowsableFolder).map(\.name) == ["Example.folder"], "Folders are browsable and app bundles and links to them open through macOS")
+    }
+}
 func checkPaths() throws {
     let base = URL(fileURLWithPath: "/Users/example/Documents")
     try expect(FileSystem.resolve("../Downloads", relativeTo: base).path == "/Users/example/Downloads", "Relative path")
@@ -250,6 +263,7 @@ func checkDuplicate() throws {
 let checks: [(String, () throws -> Void)] = [
     ("Listing, hidden files, natural sorting, folders first", checkListing),
     ("Directory symlinks", checkSymlinks), ("Path resolution", checkPaths),
+    ("Browsable folders and app bundles", checkBrowsableFolders),
     ("Navigation history", checkHistory), ("Missing directory errors", checkMissingDirectory),
     ("Per-folder preferences and default inheritance", checkFolderViews),
     ("Hidden-file defaults, per-folder overrides, restart, and legacy migration", checkHiddenFiles),

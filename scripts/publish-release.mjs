@@ -42,9 +42,7 @@ const terminals = [...source.matchAll(/case \.\w+: return "([^"]+)"/g)].map(matc
 if (terminals.length !== 14) throw new Error('Review the terminal catalog before publishing release notes');
 const body = `### What’s new
 
-- **Live selection:** Files turn blue while you drag a selection rectangle, and clear as the rectangle moves away.
-- **Confirmation settings:** Settings → Confirmations lets you independently turn off prompts for moving items to Trash and clearing Trash. Both start enabled.
-- **Same-folder drops:** Dropping items onto themselves or their current folder now does nothing, without a warning.
+- Double-clicking an app bundle now launches the app.
 
 ### Updates
 

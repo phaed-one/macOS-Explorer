@@ -802,8 +802,13 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     }
     @objc private func openSelection() {
         let selected = selection
-        if selected.count == 1, let entry = selected.first, entry.isDirectory { navigate(entry.url) }
-        else { selected.filter { !$0.isDirectory }.forEach { NSWorkspace.shared.open($0.url) } }
+        for entry in selected {
+            if entry.isBrowsableFolder {
+                if selected.count == 1 { navigate(entry.url) }
+            } else {
+                NSWorkspace.shared.open(entry.url)
+            }
+        }
     }
     @objc private func copyPath() {
         NSPasteboard.general.clearContents()
