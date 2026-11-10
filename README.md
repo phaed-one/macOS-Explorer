@@ -38,7 +38,7 @@ Each release ZIP is scanned with VirusTotal. The badge shows detections across
 the engines that completed the latest release scan; click it for the full report.
 
 <!-- VIRUSTOTAL_BADGE_START -->
-[![VirusTotal release scan: 0 detections / 62 engines](https://img.shields.io/badge/VirusTotal-0%20%2F%2062-brightgreen)](https://www.virustotal.com/gui/file/a4717f45f801780d167e6a0dee64a4e584197d387001cd284a4add2cefcd30c6)
+[![VirusTotal release scan: 0 detections / 66 engines](https://img.shields.io/badge/VirusTotal-0%20%2F%2066-brightgreen)](https://www.virustotal.com/gui/file/d312c5a58dc18a862036303a9e6573397cde2b0ab0c9a587b9d8e44b7e515a1a)
 <!-- VIRUSTOTAL_BADGE_END -->
 
 ## Using Explorer
