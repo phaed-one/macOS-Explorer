@@ -47,11 +47,29 @@ func checkFilePreviews() throws {
     let gridIcon = collection.item(at: index)!.imageView!
     try waitUntil { showsSample(gridIcon) }
 
+    // Activation refreshes the folder, replacing its cells even if the files are unchanged.
+    mode.selectedSegment = 1; mode.sendAction(mode.action, to: mode.target)
+    let beforeRefresh = table.view(atColumn: nameColumn, row: 0, makeIfNecessary: true)!
+    NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: NSApplication.shared)
+    try waitUntil { table.view(atColumn: nameColumn, row: 0, makeIfNecessary: true) !== beforeRefresh }
+    let refreshedListCell = browser.tableView(table, viewFor: table.tableColumns[nameColumn], row: 0)!
+    let refreshedListIcon = descendants(refreshedListCell).compactMap { $0 as? NSImageView }.first!
+    try require(showsSample(refreshedListIcon), "A new list cell must display its cached thumbnail on first configuration")
+
+    mode.selectedSegment = 0; mode.sendAction(mode.action, to: mode.target)
+    collection.layoutSubtreeIfNeeded()
+    try require(collection.item(at: index)?.imageView.map(showsSample) == true,
+                "A reloaded grid item must display its cached thumbnail on first configuration")
+
+    let entry = try FileSystem.contents(of: folder, showHidden: false).first!
     let recycled = FilePreviewImageView()
-    recycled.configure(for: FileEntry(url: url, isDirectory: false, isHidden: false, size: 0, modified: Date(), kind: "PNG"), size: 64, scale: 2)
+    let changed = FileEntry(url: entry.url, isDirectory: false, isHidden: false, size: entry.size,
+                            modified: entry.modified.addingTimeInterval(1), kind: entry.kind)
+    recycled.configure(for: changed, size: CGFloat(views.view(for: folder).iconSize), scale: browser.window!.backingScaleFactor)
+    try require(!showsSample(recycled), "A changed file must not reuse its previous thumbnail")
     recycled.configure(for: FileEntry(url: folder, isDirectory: true, isHidden: false, size: 0, modified: Date(), kind: "Folder"), size: 64, scale: 2)
     let folderIcon = recycled.image
     RunLoop.main.run(until: Date().addingTimeInterval(0.1))
     try require(folderIcon != nil && recycled.image === folderIcon, "A previous thumbnail must not replace a folder icon in a reused view")
-    print("PASS: List and grid show the actual PNG thumbnail, and reused views keep the current file's icon")
+    print("PASS: List and grid show PNG thumbnails immediately after activation refresh, invalidate changed files, and guard reused views")
 }

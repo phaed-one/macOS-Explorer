@@ -42,7 +42,7 @@ const terminals = [...source.matchAll(/case \.\w+: return "([^"]+)"/g)].map(matc
 if (terminals.length !== 14) throw new Error('Review the terminal catalog before publishing release notes');
 const body = `### What’s new
 
-- List and icon views now show Finder-style previews for images and other files supported by Quick Look. Folders and files without a preview keep their macOS icons.
+- File thumbnails stay visible in List and Icon views when you restore a minimized window.
 
 ### Updates
 
