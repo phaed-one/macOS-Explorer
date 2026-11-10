@@ -680,11 +680,12 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         cell.addSubview(label); cell.textField = label
         var inset: CGFloat = 8
         if key == "name" {
-            let icon = NSImageView(image: NSWorkspace.shared.icon(forFile: entry.url.path))
-            icon.alphaValue = entry.isHidden ? 0.5 : 1
+            let icon = FilePreviewImageView()
+            let iconSize: CGFloat = 19
+            icon.configure(for: entry, size: iconSize, scale: tableView.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2)
             icon.translatesAutoresizingMaskIntoConstraints = false
             cell.addSubview(icon)
-            NSLayoutConstraint.activate([icon.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8), icon.centerYAnchor.constraint(equalTo: cell.centerYAnchor), icon.widthAnchor.constraint(equalToConstant: 19), icon.heightAnchor.constraint(equalToConstant: 19)])
+            NSLayoutConstraint.activate([icon.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8), icon.centerYAnchor.constraint(equalTo: cell.centerYAnchor), icon.widthAnchor.constraint(equalToConstant: iconSize), icon.heightAnchor.constraint(equalToConstant: iconSize)])
             inset = 35
         }
         NSLayoutConstraint.activate([label.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: inset), label.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -10), label.centerYAnchor.constraint(equalTo: cell.centerYAnchor)])

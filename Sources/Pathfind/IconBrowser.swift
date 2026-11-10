@@ -76,7 +76,7 @@ final class IconBrowser: NSObject, NSCollectionViewDataSource, NSCollectionViewD
     func collectionView(_ collectionView: NSCollectionView, numberOfItemsInSection section: Int) -> Int { entries.count }
     func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt indexPath: IndexPath) -> NSCollectionViewItem {
         let item = collectionView.makeItem(withIdentifier: .init("file"), for: indexPath) as! FileIconItem
-        item.configure(entries[indexPath.item], size: iconSize)
+        item.configure(entries[indexPath.item], size: iconSize, scale: collectionView.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2)
         return item
     }
     func collectionView(_ collectionView: NSCollectionView, didSelectItemsAt indexPaths: Set<IndexPath>) { onSelection?() }
@@ -100,12 +100,12 @@ final class IconBrowser: NSObject, NSCollectionViewDataSource, NSCollectionViewD
 }
 
 private final class FileIconItem: NSCollectionViewItem {
+    private let preview = FilePreviewImageView()
     private var iconWidth: NSLayoutConstraint!
     private var iconHeight: NSLayoutConstraint!
     override func loadView() {
         view = NSView(); view.wantsLayer = true; view.layer?.cornerRadius = 7
-        let image = NSImageView()
-        image.imageScaling = .scaleProportionallyUpOrDown
+        let image = preview
         let label = NSTextField(wrappingLabelWithString: "")
         label.alignment = .center; label.maximumNumberOfLines = 2
         label.lineBreakMode = .byTruncatingMiddle
@@ -119,9 +119,8 @@ private final class FileIconItem: NSCollectionViewItem {
             label.topAnchor.constraint(equalTo: image.bottomAnchor, constant: 6), label.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 5), label.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -5), label.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor, constant: -5)
         ])
     }
-    func configure(_ entry: FileEntry, size: CGFloat) {
-        imageView?.image = NSWorkspace.shared.icon(forFile: entry.url.path)
-        imageView?.alphaValue = entry.isHidden ? 0.5 : 1
+    func configure(_ entry: FileEntry, size: CGFloat, scale: CGFloat) {
+        preview.configure(for: entry, size: size, scale: scale)
         textField?.stringValue = entry.name
         textField?.textColor = entry.isHidden ? .secondaryLabelColor : .labelColor
         view.toolTip = entry.url.path

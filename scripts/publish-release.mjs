@@ -42,7 +42,7 @@ const terminals = [...source.matchAll(/case \.\w+: return "([^"]+)"/g)].map(matc
 if (terminals.length !== 14) throw new Error('Review the terminal catalog before publishing release notes');
 const body = `### What’s new
 
-- Moving a running app to the Trash now quits it first. If the app stays open, Explorer leaves it in place.
+- List and icon views now show Finder-style previews for images and other files supported by Quick Look. Folders and files without a preview keep their macOS icons.
 
 ### Updates
 
