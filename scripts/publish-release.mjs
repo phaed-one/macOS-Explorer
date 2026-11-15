@@ -103,7 +103,7 @@ for (const asset of release.assets.filter(asset => /^Explorer-.*\.zip$/.test(ass
   await api(`releases/assets/${asset.id}`, { method: 'DELETE' });
 }
 release = await api(`releases/${release.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ body, draft: false, make_latest: 'true' }) });
+  body: JSON.stringify({ body, target_commitish: sha, draft: false, make_latest: 'true' }) });
 const latest = await api('releases/latest');
 if (latest.id !== release.id || latest.body !== body || latest.assets.length < 2) throw new Error('Published release verification failed');
 console.log(`Published ${release.html_url} with verified ZIP and signed appcast`);
