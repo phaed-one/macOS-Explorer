@@ -36,7 +36,10 @@ async function api(resource, options = {}, allowMissing = false) {
       'X-GitHub-Api-Version': '2026-03-10', ...options.headers }
   });
   if (allowMissing && response.status === 404) return null;
-  if (!response.ok) throw new Error(`GitHub request failed: HTTP ${response.status}`);
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`GitHub request failed: HTTP ${response.status}: ${error.message}`);
+  }
   return response.status === 204 ? null : response.json();
 }
 const tag = `v${version}`;
@@ -65,7 +68,18 @@ macOS 14 or later; Liquid Glass requires macOS 26. Apple Silicon build.
 Uses the same persistent self-signed identity as previous builds. Not Apple Developer ID signed or notarized.
 `;
 
-let release = await api(`releases/tags/${tag}`, {}, true);
+// The tag endpoint can omit drafts. Resume a failed publication instead of
+// creating another draft for the same version.
+async function findRelease(tag) {
+  const published = await api(`releases/tags/${tag}`, {}, true);
+  if (published) return published;
+  for (let page = 1; ; page++) {
+    const releases = await api(`releases?per_page=100&page=${page}`);
+    const draft = releases.find(release => release.tag_name === tag && release.draft);
+    if (draft || releases.length < 100) return draft ?? null;
+  }
+}
+let release = await findRelease(tag);
 if (release && !release.draft) {
   if (!process.argv.includes('--replace')) throw new Error(`${tag} is already published; use --replace only when replacing this release is explicitly authorized`);
   const latest = await api('releases/latest');
