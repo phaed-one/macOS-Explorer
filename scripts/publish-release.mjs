@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { publishUpdateSite } from './publish-update-site.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repo = 'phaed-one/macOS-Explorer';
@@ -26,6 +27,8 @@ const [archive, appcast] = await Promise.all([
   readFile(path.join(root, 'dist', manifest.archive)), readFile(path.join(root, 'dist/appcast.xml'))
 ]);
 if (sha256(archive) !== manifest.sha256 || sha256(appcast) !== manifest.appcast_sha256) throw new Error('Packaged release files changed after signing');
+const feedURL = run('/usr/libexec/PlistBuddy', ['-c', 'Print :SUFeedURL', 'dist/Explorer.app/Contents/Info.plist']);
+if (feedURL !== manifest.feed_url) throw new Error('Packaged app and release manifest use different update feeds; rebuild before publishing');
 
 async function api(resource, options = {}, allowMissing = false) {
   const response = await fetch(resource.startsWith('https://') ? resource : `https://api.github.com/repos/${repo}/${resource}`, {
@@ -42,7 +45,9 @@ const terminals = [...source.matchAll(/case \.\w+: return "([^"]+)"/g)].map(matc
 if (terminals.length !== 14) throw new Error('Review the terminal catalog before publishing release notes');
 const body = `### What’s new
 
-- File thumbnails stay visible in List and Icon views when you restore a minimized window.
+- Built-in updates download the signed feed and app archive directly from GitHub Pages.
+- Update checks exclude all optional system-profile fields, including older saved opt-ins.
+- Added documentation explaining update metadata, network folders, and privacy.
 
 ### Updates
 
@@ -76,6 +81,12 @@ for (const [name, bytes, type] of [[manifest.asset, archive, 'application/zip'],
     method: 'POST', headers: { 'Content-Type': type }, body: bytes
   });
   if (uploaded.size !== bytes.length || uploaded.digest !== `sha256:${sha256(bytes)}`) throw new Error(`${name} checksum mismatch; release left as draft`);
+}
+// Make the signed feed and archive reachable before advertising or installing this build.
+await publishUpdateSite(api, manifest, archive, appcast);
+// Replacement builds have unique archive names; leave exactly one ZIP for release scans.
+for (const asset of release.assets.filter(asset => /^Explorer-.*\.zip$/.test(asset.name) && asset.name !== manifest.asset)) {
+  await api(`releases/assets/${asset.id}`, { method: 'DELETE' });
 }
 release = await api(`releases/${release.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ body, draft: false, make_latest: 'true' }) });

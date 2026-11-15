@@ -49,6 +49,29 @@ This uploads the signed ZIP and appcast, publishes the release, and replaces
 `/Applications/Explorer.app` after stopping any running Explorer instance.
 `GH_TOKEN` is used only by the publishing tool; it is never included in the app.
 
+Starting with Explorer 0.2.8, the publisher also maintains the `gh-pages`
+branch and configures GitHub Pages to serve that branch's root. It uploads the
+exact signed feed and ZIP there before publishing the GitHub Release or
+installing the app. `GH_TOKEN` therefore needs repository Contents and Pages
+write permissions. An existing Pages site with a different URL or publishing
+source is rejected rather than overwritten. The publisher uses GitHub's Git
+and Pages APIs; no hosting credentials are added to Explorer.
+
+The app uses `https://phaed-one.github.io/macOS-Explorer/appcast.xml` and archives
+under `archives/Explorer-<version>-build<build>.zip`. Local build archive names
+remain as described above. Per-build hosting names are immutable; older archives
+remain accessible for clients that already fetched an earlier feed. Publishing
+stops before the site reaches 950 MiB or an archive reaches 100 MiB, so retention
+or hosting can be reviewed without silently deleting an active update URL.
+
+Before completing publication, the publisher waits about ten minutes for Pages
+and compares the feed and archive SHA256 hashes with redirects disabled. A failed
+hosting check stops publication and local installation. It leaves any uploaded
+release assets and Pages commit available for inspection/retry. A new release
+remains a draft; an explicitly replaced release was already public. Older apps
+continue using the signed GitHub Release feed to discover the migration build.
+No Pages changes occur during a local build or test run.
+
 When the user explicitly requests replacing the latest release, build with
 `--same-version`, commit and push, then publish with `--replace`. This replaces
 the latest release's ZIP and signed feed, moves its source tag to the replacement
@@ -80,6 +103,7 @@ triggering a false warning. Some grants require macOS's Quit & Reopen action.
 ```sh
 swift run PathfindChecks
 zsh scripts/check-native.sh
+node --test Tests/ReleaseChecks/*.test.mjs
 ```
 
 To exercise a real network mount, run the native checks with

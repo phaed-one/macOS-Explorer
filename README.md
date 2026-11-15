@@ -43,6 +43,11 @@ the engines that completed the latest release scan; click it for the full report
 
 ## Using Explorer
 
+Explorer does not send your local files, searches, or navigation history to the
+developer. Update hosting receives ordinary connection metadata, and browsing
+network or cloud folders can communicate with their servers. See
+[Privacy and network activity](docs/privacy.md) for details.
+
 In Settings → Show in Finder, choose **Use Explorer** to open “Show in Finder”
 requests in Explorer. Folders opened from the desktop or Dock still use Finder.
 

@@ -1,4 +1,5 @@
 import AppKit
+import Sparkle
 
 @MainActor func checkUpdateInterface() throws {
     let updates = UpdateStatusView()
@@ -23,5 +24,22 @@ import AppKit
     try require(stack != nil, "The Updates section must be at the very top of Settings")
     let idle = AppUpdater.shared.state == .idle
     try require(idle, "Creating windows and settings must not start update checks or popups; startup owns the first probe")
+    // Exercise Sparkle's real filtering boundary, including an older saved profile opt-in.
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".app")
+    let identifier = "local.pathfind.update-privacy-check.\(UUID().uuidString)"
+    defer {
+        try? FileManager.default.removeItem(at: directory)
+        UserDefaults.standard.removePersistentDomain(forName: identifier)
+    }
+    try FileManager.default.createDirectory(at: directory.appendingPathComponent("Contents"), withIntermediateDirectories: true)
+    let info = ["CFBundleIdentifier": identifier, "CFBundleName": "UpdatePrivacyCheck", "CFBundleVersion": "1"]
+    try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+        .write(to: directory.appendingPathComponent("Contents/Info.plist"))
+    let host = Bundle(url: directory)!
+    let driver = SPUStandardUserDriver(hostBundle: host, delegate: nil)
+    let updater = SPUUpdater(hostBundle: host, applicationBundle: host, userDriver: driver, delegate: AppUpdater.shared)
+    updater.sendsSystemProfile = true
+    try require(updater.systemProfileArray.isEmpty, "No system profile fields may be available to send, even with an older opt-in")
     print("PASS: Quiet update progress, available/current/offline states, Update action, top-of-Settings placement, and non-blocking badge")
+    print("PASS: Sparkle system-profile fields are excluded even when its saved preference is enabled")
 }

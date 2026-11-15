@@ -9,6 +9,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from email.utils import format_datetime
 from pathlib import Path
+from urllib.parse import urljoin
 
 archive, info_path, output = map(Path, sys.argv[1:])
 root = Path(__file__).resolve().parent.parent
@@ -30,9 +31,11 @@ ET.SubElement(item, 'link').text = f'https://github.com/phaed-one/macOS-Explorer
 ET.SubElement(item, f'{{{ns}}}version').text = build
 ET.SubElement(item, f'{{{ns}}}shortVersionString').text = version
 ET.SubElement(item, f'{{{ns}}}minimumSystemVersion').text = info['LSMinimumSystemVersion']
-asset_name = f'Explorer-{version}.zip'
+asset_name = f'Explorer-{version}-build{build}.zip'
+feed_url = info['SUFeedURL']
+download_url = urljoin(feed_url, f'archives/{asset_name}')
 ET.SubElement(item, 'enclosure', {
-    'url': f'https://github.com/phaed-one/macOS-Explorer/releases/download/v{version}/{asset_name}',
+    'url': download_url,
     'length': str(archive.stat().st_size), 'type': 'application/octet-stream',
     f'{{{ns}}}edSignature': signature, f'{{{ns}}}os': 'macos',
 })
@@ -43,6 +46,7 @@ subprocess.run([str(signer), *account, str(feed)], check=True)
 subprocess.run([str(signer), *account, '--verify', str(feed)], check=True)
 (output / 'release.json').write_text(json.dumps({
     'version': version, 'build': build, 'archive': archive.name, 'asset': asset_name,
+    'feed_url': feed_url, 'download_url': download_url,
     'sha256': hashlib.sha256(archive.read_bytes()).hexdigest(),
     'appcast_sha256': hashlib.sha256(feed.read_bytes()).hexdigest(),
 }, indent=2) + '\n')

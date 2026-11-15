@@ -18,6 +18,8 @@ import Sparkle
     func start() {
         guard !started else { return }
         do {
+            // Apply before startup can schedule a request, overriding any older saved opt-in.
+            updater.sendsSystemProfile = false
             try updater.start()
             started = true
             checkQuietly()
@@ -33,6 +35,7 @@ import Sparkle
         guard started, updater.canCheckForUpdates else { return }
         updater.checkForUpdates()
     }
+    func allowedSystemProfileKeys(for updater: SPUUpdater) -> [String]? { [] }
     func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
         state = .available(item.displayVersionString)
     }
