@@ -515,14 +515,19 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         if searchState != .gathering { applyPendingRestore() }
     }
     private func updateStatus() {
-        let count = visible.count, selected = selection.count
+        let count = visible.count, selected = selection
+        var selectionStatus = selected.isEmpty ? "" : " · \(selected.count) selected"
+        if !selected.isEmpty && selected.allSatisfy({ !$0.isDirectory }) {
+            let size = selected.reduce(Int64(0)) { $0 + $1.size }
+            selectionStatus += " · " + ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
+        }
         if isSearching {
             let progress = searchState == .gathering ? "Searching Spotlight…" : searchState == .unavailable ? "Spotlight search is unavailable" : "Spotlight"
-            status.stringValue = "\(count) results" + (selected > 0 ? " · \(selected) selected" : "") + " · \(progress) · Folder and subfolders · Excluded locations are not searched"
+            status.stringValue = "\(count) results" + selectionStatus + " · \(progress) · Folder and subfolders · Excluded locations are not searched"
             updateFavoriteButton()
             return
         }
-        status.stringValue = "\(count) items" + (selected > 0 ? " · \(selected) selected" : "") + "    ·    \(BrowserLocation.path(current))" + (showHidden ? "    ·    Hidden files visible" : "")
+        status.stringValue = "\(count) items" + selectionStatus + "    ·    \(BrowserLocation.path(current))" + (showHidden ? "    ·    Hidden files visible" : "")
         updateFavoriteButton()
     }
     func controlTextDidChange(_ obj: Notification) {

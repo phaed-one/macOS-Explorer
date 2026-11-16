@@ -48,9 +48,9 @@ const terminals = [...source.matchAll(/case \.\w+: return "([^"]+)"/g)].map(matc
 if (terminals.length !== 14) throw new Error('Review the terminal catalog before publishing release notes');
 const body = `### What’s new
 
-- Built-in updates download the signed feed and app archive directly from GitHub Pages.
-- Update checks exclude all optional system-profile fields, including older saved opt-ins.
-- Added documentation explaining update metadata, network folders, and privacy.
+- The footer now shows the size of a selected file or the combined size of multiple selected files.
+- Selections containing any folder show the selection count without a size.
+- Selection sizes appear in both Details and Icons views, including search results.
 
 ### Updates
 

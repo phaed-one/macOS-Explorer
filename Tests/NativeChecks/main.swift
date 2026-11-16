@@ -335,6 +335,7 @@ do {
     try checkDiskAccessOnboarding()
     try checkServerConnections()
     try checkIconSpacing()
+    try checkSelectionStatus()
     try checkFilePreviews()
     try checkFileDropNoOps()
     try checkLiveIconHighlight()
