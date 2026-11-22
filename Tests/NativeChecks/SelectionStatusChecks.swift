@@ -34,11 +34,11 @@ func checkSelectionStatus() throws {
         (["folder"], nil), (["folder", "small.txt"], nil),
         (["large.txt", "small.txt", "empty.txt"], 1_102_340), ([], nil)
     ]
-    for segment in [1, 0] {
+    for segment in [2, 1, 0] {
         mode.selectedSegment = segment; mode.sendAction(mode.action, to: mode.target)
         for (names, size) in cases {
             let indexes = names.map { rows[$0]! }
-            if segment == 1 {
+            if segment == 2 {
                 table.selectRowIndexes(IndexSet(indexes), byExtendingSelection: false)
             } else {
                 let paths = Set(indexes.map { IndexPath(item: $0, section: 0) })
@@ -52,5 +52,5 @@ func checkSelectionStatus() throws {
             try require(status.stringValue == expected, "Selection footer must show only file totals in mode \(segment): \(status.stringValue)")
         }
     }
-    print("PASS: Selection footer totals for single/multiple/empty files, folders, mixed selections, and deselection in Details and Icons")
+    print("PASS: Selection footer totals for single/multiple/empty files, folders, mixed selections, and deselection in Details, List, and Icons")
 }

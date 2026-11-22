@@ -36,7 +36,8 @@ final class AncestorPathBar: NSView {
             let title = location == TrashStore.location ? "Trash" : location.path == "/" ? "/" : location.lastPathComponent
             let button = NSButton(title: title, target: self, action: #selector(openAncestor))
             button.bezelStyle = .rounded
-            button.font = .systemFont(ofSize: 12, weight: .medium)
+            // The current folder ends the path; weight sets it apart from the ancestors.
+            button.font = .systemFont(ofSize: 12, weight: index == path.count - 1 ? .bold : .medium)
             button.tag = index
             button.setAccessibilityLabel("Go to ancestor folder: \(location.path)")
             ToolbarHelp.install(on: button, text: "Open \(location == TrashStore.location ? "Trash" : location.path)")

@@ -1,14 +1,15 @@
 import Foundation
 
 public enum FolderViewMode: String, Codable, Sendable {
-    case details, icons
+    case details, icons, list
 }
 
 public struct FolderViewPreferences: Codable, Equatable, Sendable {
     public var mode: FolderViewMode = .icons
     public var iconSize: Double = 64
-    // Optional so existing saved views decode without losing their settings.
+    // Optional so existing saved views decode without losing their icon spacing.
     public var iconSpacing: Double? = nil
+    public var listSpacing: Double? = nil
     public var sort: FileSort = .name
     public var ascending = true
     public var foldersFirst = true

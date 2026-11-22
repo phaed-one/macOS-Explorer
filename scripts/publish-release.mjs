@@ -48,10 +48,14 @@ const terminals = [...source.matchAll(/case \.\w+: return "([^"]+)"/g)].map(matc
 if (terminals.length !== 14) throw new Error('Review the terminal catalog before publishing release notes');
 const body = `### What’s new
 
-- The path breadcrumb now includes the current folder and keeps parent navigation available.
-- New folder and file dialogs let you set POSIX permissions with access checkboxes or octal and symbolic modes.
-- New folders default to 0755 and new files to 0644; the selected mode is applied when the item is created.
-- Right-click a file to choose an app from a filterable Open With menu or set it as the default for its file type.
+- The right-click menu for files and folders follows Finder's order, groups and icons.
+- New **Compress** and **Make Alias** commands work like Finder's: one item becomes \`name.zip\`, several become \`Archive.zip\`.
+- Open With lists your default and every app you've picked before under **Recent**, above the other apps.
+- File icons for types macOS doesn't know (\`.toml\`, \`.properties\`, \`.env\`) come from the app that opens them, and update as soon as you change the default.
+- Open With and the file icon show the app a double-click really uses, including text files with no extension.
+- **Set as default** on a file with no extension (\`.env\`, \`Makefile\`) applies to every file with that name in your home folder, and to new ones Explorer finds. Finder follows the choice too.
+- A new List view scrolls sideways through columns of names, and each folder remembers its view.
+- The current folder is shown in bold at the end of the path bar.
 
 ### Updates
 

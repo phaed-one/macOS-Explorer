@@ -11,6 +11,6 @@ enum BrowserLocation {
     static func path(_ url: URL) -> String { url == TrashStore.location ? "Trash" : url.path }
     static func icon(_ url: URL) -> NSImage {
         if url == TrashStore.location { return NSImage(systemSymbolName: "trash", accessibilityDescription: "Trash")! }
-        return NSWorkspace.shared.icon(forFile: url.path)
+        return DocumentIcon.icon(forFile: url)
     }
 }

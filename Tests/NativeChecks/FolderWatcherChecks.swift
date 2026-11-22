@@ -18,7 +18,7 @@ func checkLiveFolderUpdates() throws {
     let icons = collection.delegate as! IconBrowser
     let table = views.compactMap { $0 as? FileTableView }.first!
     let mode = views.compactMap { $0 as? NSSegmentedControl }.first!
-    mode.selectedSegment = 1; mode.sendAction(mode.action, to: mode.target)
+    mode.selectedSegment = 2; mode.sendAction(mode.action, to: mode.target)
     let file = root.appendingPathComponent("watched.txt")
     try Data("one".utf8).write(to: file)
     try waitFor("external create") { icons.entries.contains { $0.name == "watched.txt" } }

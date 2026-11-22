@@ -49,7 +49,7 @@ final class FileDragSource: NSObject, NSDraggingSource {
             writer.setString(url.absoluteString, forType: .fileURL)
             writer.setString("true", forType: FileTransfer.moveType)
             let item = NSDraggingItem(pasteboardWriter: writer)
-            item.setDraggingFrame(NSRect(x: origin.x + CGFloat(index * 3), y: origin.y, width: 40, height: 40), contents: NSWorkspace.shared.icon(forFile: url.path))
+            item.setDraggingFrame(NSRect(x: origin.x + CGFloat(index * 3), y: origin.y, width: 40, height: 40), contents: DocumentIcon.icon(forFile: url))
             return item
         }
         view.beginDraggingSession(with: items, event: event, source: self)

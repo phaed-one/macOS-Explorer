@@ -27,7 +27,7 @@ final class PermissionsController: NSWindowController, NSTextFieldDelegate {
         let owner = attributes?[.ownerAccountName] as? String, group = attributes?[.groupOwnerAccountName] as? String
 
         // Header: which item, and its mode now.
-        let icon = NSImageView(image: NSWorkspace.shared.icon(forFile: urls[0].path))
+        let icon = NSImageView(image: DocumentIcon.icon(forFile: urls[0]))
         icon.widthAnchor.constraint(equalToConstant: 44).isActive = true
         icon.heightAnchor.constraint(equalToConstant: 44).isActive = true
         let heading = NSTextField(labelWithString: urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) selected items")

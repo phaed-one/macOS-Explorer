@@ -52,14 +52,15 @@ func checkFavoriteAndVisibilityControls() throws {
     let all = descendants(browser.window!.contentView!)
     let table = all.compactMap { $0 as? FileTableView }.first!
     let mode = all.compactMap { $0 as? NSSegmentedControl }.first!
-    mode.selectedSegment = 1; mode.sendAction(mode.action, to: mode.target)
+    mode.selectedSegment = 2; mode.sendAction(mode.action, to: mode.target)
     browser.window!.contentView!.layoutSubtreeIfNeeded()
     let ancestorBar = all.compactMap { $0 as? AncestorPathBar }.first!
     let up = descendants(ancestorBar).compactMap { $0 as? NSButton }.first { $0.accessibilityLabel() == "Go to parent folder" }!
     func ancestorButtons() -> [NSButton] { descendants(ancestorBar).compactMap { $0 as? NSButton }.filter { $0.accessibilityLabel()?.hasPrefix("Go to ancestor folder:") == true } }
-    let parentButton = ancestorButtons().last!
-    try require(ancestorButtons().first?.title == "/" && parentButton.title == root.lastPathComponent && ancestorButtons().allSatisfy { $0.image == nil && $0.bezelColor == nil }, "Details must show neutral ancestor buttons from root to parent without arrows")
-    try require(!ancestorButtons().contains { $0.title == a.lastPathComponent }, "The current folder must not appear among its ancestors")
+    let pathButtons = ancestorButtons()
+    let parentButton = pathButtons[pathButtons.count - 2]
+    try require(pathButtons.first?.title == "/" && parentButton.title == root.lastPathComponent && pathButtons.allSatisfy { $0.image == nil && $0.bezelColor == nil }, "Details must show neutral path buttons from root to parent without arrows")
+    try require(pathButtons.last?.title == a.lastPathComponent && pathButtons.filter { $0.title == a.lastPathComponent }.count == 1, "The current folder must end the path, once")
     NotificationCenter.default.post(name: BrowserTheme.changed, object: nil)
     try require((ancestorButtons() + [up]).allSatisfy { $0.bezelStyle == .rounded }, "Path buttons and the parent button must stay flat, not glass, even after an appearance change")
     let removedActions = ["goBack", "goForward", "goUp", "refresh"].map(NSSelectorFromString)
@@ -99,7 +100,7 @@ func checkFavoriteAndVisibilityControls() throws {
     collection.deselectAll(nil)
     (collection.delegate as! IconBrowser).collectionView(collection, didDeselectItemsAt: [])
     try require(!star.isEnabled, "Deselecting the folder must dim Favorite")
-    mode.selectedSegment = 1; mode.sendAction(mode.action, to: mode.target)
+    mode.selectedSegment = 2; mode.sendAction(mode.action, to: mode.target)
     let localEye = all.compactMap { $0 as? NSButton }.first { $0.action == NSSelectorFromString("toggleFolderHidden") }!
     let globalEye = all.compactMap { $0 as? NSButton }.first { $0.action == NSSelectorFromString("toggleHidden") }!
     localEye.performClick(nil)
@@ -107,7 +108,8 @@ func checkFavoriteAndVisibilityControls() throws {
     browser.navigate(b)
     try waitUntil { browser.window?.representedURL == b && table.numberOfRows == 1 }
     try require(localEye.state == .off, "Showing hidden files in A must not affect B")
-    try require(ancestorButtons().last?.title == a.lastPathComponent, "The ancestor buttons must follow navigation")
+    let followed = ancestorButtons().map(\.title)
+    try require(followed.suffix(2) == [a.lastPathComponent, b.lastPathComponent], "The path buttons must follow navigation")
     up.performClick(nil)
     try waitUntil { browser.window?.representedURL?.path == a.path }
     browser.navigate(a)
@@ -141,6 +143,6 @@ func checkFavoriteAndVisibilityControls() throws {
     try require(!HelpPopup.shared.isVisible, "Leaving a control must dismiss its tooltip")
     browser.navigate(URL(fileURLWithPath: "/"))
     try waitUntil { browser.window?.representedURL?.path == "/" }
-    try require(!up.isEnabled && ancestorButtons().isEmpty, "Parent navigation must be disabled at the filesystem root")
+    try require(!up.isEnabled && ancestorButtons().map(\.title) == ["/"], "At the filesystem root the path is just / and parent navigation is disabled")
     print("PASS: Favorite states, per-folder visibility, ancestor navigation in both views, simplified toolbar, and one-second tooltips")
 }

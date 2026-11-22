@@ -32,7 +32,7 @@ final class FileInfoController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
         window.title = "\(url.lastPathComponent) Info"; window.delegate = self
         window.isReleasedWhenClosed = false
-        let icon = NSImageView(image: NSWorkspace.shared.icon(forFile: url.path))
+        let icon = NSImageView(image: DocumentIcon.icon(forFile: url))
         icon.widthAnchor.constraint(equalToConstant: 48).isActive = true
         icon.heightAnchor.constraint(equalToConstant: 48).isActive = true
         let name = NSTextField(wrappingLabelWithString: url.lastPathComponent)

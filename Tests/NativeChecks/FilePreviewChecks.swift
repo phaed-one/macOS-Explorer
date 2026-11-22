@@ -34,7 +34,7 @@ func checkFilePreviews() throws {
         return color.redComponent > 0.8 && color.greenComponent < 0.2 && color.blueComponent < 0.2
     }
 
-    mode.selectedSegment = 1; mode.sendAction(mode.action, to: mode.target)
+    mode.selectedSegment = 2; mode.sendAction(mode.action, to: mode.target)
     let nameColumn = table.column(withIdentifier: .init("name"))
     let listCell = table.view(atColumn: nameColumn, row: 0, makeIfNecessary: true)!
     let listIcon = descendants(listCell).compactMap { $0 as? NSImageView }.first!
@@ -48,7 +48,7 @@ func checkFilePreviews() throws {
     try waitUntil { showsSample(gridIcon) }
 
     // Activation refreshes the folder, replacing its cells even if the files are unchanged.
-    mode.selectedSegment = 1; mode.sendAction(mode.action, to: mode.target)
+    mode.selectedSegment = 2; mode.sendAction(mode.action, to: mode.target)
     let beforeRefresh = table.view(atColumn: nameColumn, row: 0, makeIfNecessary: true)!
     NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: NSApplication.shared)
     try waitUntil { table.view(atColumn: nameColumn, row: 0, makeIfNecessary: true) !== beforeRefresh }

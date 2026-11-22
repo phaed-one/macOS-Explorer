@@ -49,6 +49,60 @@ public enum FileSystem {
             number += 1
         }
     }
+    /// `base` + `suffix` in `directory`, or the first unused "base 2" + `suffix`, "base 3" + `suffix`, ….
+    private static func freeName(_ base: String, _ suffix: String, in directory: URL) -> URL {
+        var candidate = directory.appendingPathComponent(base + suffix), number = 2
+        while itemExists(candidate) {
+            candidate = directory.appendingPathComponent("\(base) \(number)\(suffix)")
+            number += 1
+        }
+        return candidate
+    }
+    /// Finder's Make Alias: an alias file named "<name> alias" beside the item.
+    @discardableResult
+    public static func makeAlias(_ source: URL) throws -> URL {
+        let bookmark = try source.bookmarkData(options: .suitableForBookmarkFile, includingResourceValuesForKeys: nil, relativeTo: nil)
+        let destination = freeName("\(source.lastPathComponent) alias", "", in: source.deletingLastPathComponent())
+        try URL.writeBookmarkData(bookmark, to: destination)
+        return destination
+    }
+    /// Finder's Compress: one item becomes "<name>.zip", several become "Archive.zip", in `directory`.
+    @discardableResult
+    public static func compress(_ sources: [URL], into directory: URL) throws -> URL {
+        guard let first = sources.first else { throw CocoaError(.fileNoSuchFile) }
+        if sources.count == 1 {
+            let destination = freeName(first.lastPathComponent, ".zip", in: directory)
+            // --keepParent names a folder's contents after it; on a file it would add the enclosing folder.
+            let isFolder = (try? first.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+            try ditto(["-c", "-k", "--sequesterRsrc"] + (isFolder ? ["--keepParent"] : []) + [first.path, destination.path])
+            return destination
+        }
+        // ditto archives one item, so gather the selection (APFS clones, not full copies) in one folder.
+        let staging = try FileManager.default.url(for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: directory, create: true)
+        defer { try? FileManager.default.removeItem(at: staging) }
+        for source in sources {
+            let target = staging.appendingPathComponent(source.lastPathComponent)
+            try FileManager.default.copyItem(at: source, to: itemExists(target) ? availableDestination(for: source, in: staging) : target)
+        }
+        let destination = freeName("Archive", ".zip", in: directory)
+        try ditto(["-c", "-k", "--sequesterRsrc", staging.path, destination.path])
+        return destination
+    }
+    private static func ditto(_ arguments: [String]) throws {
+        let process = Process(), errors = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        process.arguments = arguments
+        process.standardError = errors
+        try process.run()
+        let message = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw NSError(domain: "Explorer.Compress", code: Int(process.terminationStatus), userInfo: [
+                NSLocalizedDescriptionKey: "The items couldn’t be compressed.",
+                NSLocalizedFailureReasonErrorKey: message.trimmingCharacters(in: .whitespacesAndNewlines)
+            ])
+        }
+    }
     @discardableResult
     public static func duplicate(_ source: URL) throws -> URL {
         let (name, suffix) = nameParts(source)

@@ -198,6 +198,35 @@ do {
     let infoText = descendants(infoWindow!.contentView!).compactMap { ($0 as? NSTextField)?.stringValue }
     try require(infoText.contains(infoFile.path) && infoText.contains("0640") && infoText.contains { $0.contains("128 bytes") }, "Get Info must show the real path, size, and permissions")
     infoWindow!.performClose(nil)
+    // Item menus follow Finder's order, groups and icons, and Compress and Make Alias work from them.
+    // After a file operation the folder reloads; commands are disabled until it finishes.
+    func selectSample() throws {
+        try waitUntil {
+            guard menuCollection.numberOfItems(inSection: 0) > 0 else { return false }
+            menuCollection.selectionIndexPaths = [IndexPath(item: 0, section: 0)]
+            browser.menuNeedsUpdate(contextMenu)
+            return contextMenu.items.first { $0.title == "Compress “sample.txt”" }?.isEnabled == true
+        }
+    }
+    browser.menuNeedsUpdate(contextMenu)
+    let trashTitle = ConfirmationPreference.moveToTrash.isEnabled ? "Move to Trash…" : "Move to Trash"
+    let layout = contextMenu.items.map { $0.isSeparatorItem ? "-" : $0.title }
+    try require(layout == ["Open", "Open With…", "-", trashTitle, "-", "Get Info", "Rename…", "Compress “sample.txt”", "Duplicate", "Make Alias", "Permissions…",
+                           "-", "Copy", "Cut", "Copy Path", "-", "Reveal in Finder"], "Item menus must follow Finder's order and groups, got \(layout)")
+    let iconless = Set(contextMenu.items.filter { !$0.isSeparatorItem && $0.image == nil }.map(\.title))
+    try require(iconless == ["Open With…", "Reveal in Finder"], "Every command but Open With and the last group shows an icon, as in Finder: \(iconless)")
+    func run(_ title: String) {
+        let item = contextMenu.items.first { $0.title == title }!
+        app.sendAction(item.action!, to: item.target, from: item)
+    }
+    run("Make Alias")
+    let alias = menuFixture.appendingPathComponent("sample.txt alias")
+    try waitUntil { (try? alias.resourceValues(forKeys: [.isAliasFileKey]).isAliasFile) == true }
+    try require((try? URL(resolvingAliasFileAt: alias))?.standardizedFileURL.path == infoFile.standardizedFileURL.path, "Make Alias must create an alias to the item beside it")
+    try selectSample()
+    run("Compress “sample.txt”")
+    try waitUntil { FileManager.default.fileExists(atPath: menuFixture.appendingPathComponent("sample.txt.zip").path) }
+    try selectSample()
     browser.navigate(originalFolder)
     try waitUntil { window.representedURL?.path == originalFolder.path }
     print("PASS: Background/item context menus are distinct and Get Info opens real item metadata")
@@ -335,6 +364,12 @@ do {
     try checkDiskAccessOnboarding()
     try checkServerConnections()
     try checkIconSpacing()
+    try checkFolderViewModePersistence()
+    try checkOpenWithColumns()
+    try checkOpenWithRecents()
+    try checkDefaultApplicationTargets()
+    try checkDocumentIcons()
+    try checkCompressAndAlias()
     try checkSelectionStatus()
     try checkFilePreviews()
     try checkFileDropNoOps()

@@ -1,5 +1,6 @@
 import AppKit
 import PathfindCore
+import UniformTypeIdentifiers
 
 final class BrowserController: NSWindowController, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate, NSMenuDelegate, NSSplitViewDelegate {
     private let sidebar: Sidebar
@@ -43,7 +44,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     }
     /// Saved selection and scroll waiting for a folder (or its search results) to finish loading.
     private var pendingRestore: (folder: URL, selection: Set<URL>, scroll: Double?)?
-    private var activeScroll: NSScrollView { isSearching || folderView.mode != .icons ? files : icons.scroll }
+    private var activeScroll: NSScrollView { isSearching || folderView.mode == .details ? files : icons.scroll }
     private func rememberActiveTabState() {
         guard pendingRestore == nil else { return }
         tabs.current.selection = selection.map(\.url)
@@ -72,11 +73,14 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     private let iconSlider = LiveSlider(value: 64, minValue: 32, maxValue: 160, target: nil, action: nil)
     private let spacingSlider = LiveSlider(value: 10, minValue: 0, maxValue: 40, target: nil, action: nil)
     private let viewMenu = NSMenu(), sortMenu = NSMenu()
+    private var resetViewButton: NSButton?
     private let openWithMenu = OpenWithMenu()
     private let viewToggle = NSSegmentedControl()
     private let viewStore = FolderViewStore()
     private let hiddenFiles = HiddenFileStore()
     private var folderView = FolderViewPreferences()
+    /// The folder `folderView` was loaded for. Saves go here, never to a folder whose view hasn't loaded yet.
+    private var viewFolder: URL?
     private var restoringView = true
     private var restoringLayout = true
     private let dragSource = FileDragSource()
@@ -228,22 +232,28 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         search.font = .systemFont(ofSize: 14)
         search.heightAnchor.constraint(equalToConstant: 36).isActive = true
         search.widthAnchor.constraint(equalToConstant: 280).isActive = true
+        // A chevron-only pull-down: its first item is the (empty) button title.
         let viewControl = NSPopUpButton(frame: .zero, pullsDown: true)
         viewControl.isBordered = false
-        if #available(macOS 26, *) { viewControl.widthAnchor.constraint(equalToConstant: 40).isActive = true }
+        viewControl.widthAnchor.constraint(equalToConstant: 30).isActive = true
         ToolbarHelp.install(on: viewControl, text: "Folder view options")
         viewControl.setAccessibilityLabel("View options")
-        viewMenu.delegate = self; viewControl.menu = viewMenu
-        rebuildViewMenu()
-        viewToggle.segmentCount = 2
+        viewMenu.addItem(withTitle: "", action: nil, keyEquivalent: "")
+        viewMenu.addItem(withTitle: "Make Current View the Default", action: #selector(makeViewDefault), keyEquivalent: "").target = self
+        viewControl.menu = viewMenu
+        let resetView = button("arrow.counterclockwise", "Reset this folder to the default view", #selector(restoreViewDefault))
+        resetViewButton = resetView
+        viewToggle.segmentCount = 3
         viewToggle.setImage(NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: "Icons view"), forSegment: 0)
-        viewToggle.setImage(NSImage(systemSymbolName: "list.bullet", accessibilityDescription: "Details view"), forSegment: 1)
-        viewToggle.setWidth(32, forSegment: 0); viewToggle.setWidth(32, forSegment: 1)
+        viewToggle.setImage(NSImage(systemSymbolName: "list.bullet", accessibilityDescription: "List view"), forSegment: 1)
+        viewToggle.setImage(NSImage(systemSymbolName: "tablecells", accessibilityDescription: "Details view"), forSegment: 2)
+        for segment in 0..<3 { viewToggle.setWidth(30, forSegment: segment) }
         viewToggle.trackingMode = .selectOne
         viewToggle.target = self; viewToggle.action = #selector(changeViewSegment(_:))
         viewToggle.setAccessibilityLabel("Folder view")
-        ToolbarHelp.install(on: viewToggle, text: "Icons / Details view", textAtPoint: { [weak viewToggle] point in
-            point.x < (viewToggle?.bounds.midX ?? 32) ? "Icons view" : "Details view"
+        ToolbarHelp.install(on: viewToggle, text: "Icons / List / Details view", textAtPoint: { [weak viewToggle] point in
+            let third = (viewToggle?.bounds.width ?? 90) / 3
+            return point.x < third ? "Icons view" : point.x < 2 * third ? "List view" : "Details view"
         })
         let sortControl = NSPopUpButton(frame: .zero, pullsDown: true)
         sortMenu.delegate = self; sortControl.menu = sortMenu
@@ -251,14 +261,14 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         ToolbarHelp.install(on: sortControl, text: "Sort files and folders")
         iconSlider.target = self; iconSlider.action = #selector(iconSizeChanged)
         iconSlider.isContinuous = true
-        iconSlider.widthAnchor.constraint(equalToConstant: 110).isActive = true
+        iconSlider.widthAnchor.constraint(equalToConstant: 90).isActive = true
         iconSlider.setAccessibilityLabel("Icon size")
         ToolbarHelp.install(on: iconSlider, text: "Icon size")
         spacingSlider.target = self; spacingSlider.action = #selector(iconSpacingChanged)
         spacingSlider.isContinuous = true; spacingSlider.controlSize = .small
         spacingSlider.widthAnchor.constraint(equalToConstant: 56).isActive = true
         spacingSlider.setAccessibilityLabel("Icon spacing")
-        ToolbarHelp.install(on: spacingSlider, text: "Icon spacing — tight to wide")
+        ToolbarHelp.install(on: spacingSlider, text: "Spacing — tight to wide. Icons and List each keep their own.")
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
@@ -306,12 +316,12 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             button("clipboard", "Paste (⌘V)", #selector(pasteFiles)),
             button("pencil", "Rename (F2)", #selector(rename)),
             button("trash", "Move to Trash (⌘Delete)", #selector(trash)),
-            divider(), sortControl, viewToggle, viewControl, iconSlider, spacingSlider, divider(), hidden, folderHidden,
+            divider(), sortControl, viewToggle, resetView, viewControl, iconSlider, spacingSlider, divider(), hidden, folderHidden,
             favorite, connect, spacer,
             settings
         ])
-        commands.spacing = 6; commands.heightAnchor.constraint(equalToConstant: 36).isActive = true
-        commands.setCustomSpacing(28, after: favorite)
+        commands.spacing = 5; commands.heightAnchor.constraint(equalToConstant: 36).isActive = true
+        commands.setCustomSpacing(24, after: favorite)
         commands.setCustomSpacing(4, after: iconSlider)
         let top = NSStackView(views: [navigation, commands])
         top.orientation = .vertical; top.alignment = .leading; top.spacing = 10
@@ -423,7 +433,9 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         }
         request += 1
         var preferences = viewStore.view(for: url)
-        if !urls.isEmpty { preferences.filter = "" }
+        // Revealing files clears the folder's filter so they show; save that so the filter doesn't return.
+        let clearsFilter = !urls.isEmpty && !preferences.filter.isEmpty
+        if clearsFilter { preferences.filter = "" }
         let version = request, showHidden = hiddenFiles.showsHidden(in: url)
         status.stringValue = "Loading \(url.path)…"
         queue.async {
@@ -433,6 +445,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
                 switch result {
                 case .success(let entries):
                     self.current = url; self.entries = entries
+                    SameNameDefaults.shared.adopt(entries.map(\.url))
                     self.folderWatcher.watch(url == TrashStore.location ? self.trashStore.directories : [url])
                     if let historyOnSuccess { self.history = historyOnSuccess }
                     else if record { self.history.visit(url) }
@@ -441,6 +454,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
                     self.window?.title = "\(BrowserLocation.title(url)) — Explorer"
                     self.window?.representedURL = url
                     self.applyView(preferences)
+                    if clearsFilter { self.saveView() }
                     self.creationButtons.forEach { $0.isEnabled = !self.isTrashBrowsing }
                     self.table.deselectAll(nil)
                     self.applyFilter()
@@ -452,7 +466,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
                         self.icons.collection.selectionIndexPaths = Set(indexes.map { IndexPath(item: $0, section: 0) })
                         if let first = indexes.first {
                             self.table.scrollRowToVisible(first)
-                            self.icons.collection.scrollToItems(at: [IndexPath(item: first, section: 0)], scrollPosition: .nearestHorizontalEdge)
+                            self.icons.scrollToItem(first)
                         }
                         self.updateStatus()
                     }
@@ -475,6 +489,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
                 guard case .success(let entries) = result else { return }
                 let selected = Set(self.selection.map(\.url))
                 self.entries = entries
+                SameNameDefaults.shared.adopt(entries.map(\.url))
                 if self.isSearching { self.sidebar.reload(); return }
                 self.applyFilter()
                 let indexes = self.visible.indices.filter { selected.contains(self.visible[$0].url) }
@@ -546,7 +561,11 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         guard let sort = tableView.sortDescriptors.first, let key = sort.key, let value = FileSort(rawValue: key) else { return }
         sortKey = value; ascending = sort.ascending; saveView(); applyFilter()
     }
-    func tableViewColumnDidResize(_ notification: Notification) { saveColumnLayout() }
+    func tableViewColumnDidResize(_ notification: Notification) {
+        // Window resizes also resize columns; only a column the user drags makes this folder's view its own.
+        guard table.headerView?.resizedColumn ?? -1 >= 0 else { return }
+        saveColumnLayout()
+    }
     func tableViewColumnDidMove(_ notification: Notification) { saveColumnLayout() }
     private func saveColumnLayout() {
         guard !restoringView, !isSearching else { return }
@@ -562,7 +581,9 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         restoringView = true
         defer { restoringView = false }
         folderView = view
-        viewToggle.selectedSegment = view.mode == .icons ? 0 : 1
+        viewFolder = current
+        resetViewButton?.isEnabled = viewStore.hasOverride(for: current)
+        viewToggle.selectedSegment = view.mode == .icons ? 0 : view.mode == .list ? 1 : 2
         if search.stringValue != view.filter { search.stringValue = view.filter }
         updateHiddenControls()
         configureTableColumns()
@@ -575,7 +596,8 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             column.width = max(70, view.columnWidths[column.identifier.rawValue] ?? defaultColumnWidth(column.identifier.rawValue))
         }
         icons.iconSize = min(160, max(32, view.iconSize))
-        icons.iconSpacing = min(40, max(0, view.iconSpacing ?? 10))
+        let spacing = view.mode == .list ? view.listSpacing ?? 10 : view.iconSpacing ?? 10
+        icons.iconSpacing = min(40, max(0, spacing))
         icons.currentFolder = current
         iconSlider.doubleValue = Double(icons.iconSize)
         spacingSlider.doubleValue = Double(icons.iconSpacing)
@@ -601,9 +623,10 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     private func updateFilePanePresentation() {
         configureTableColumns()
         files.isHidden = !isSearching && folderView.mode != .details
-        icons.scroll.isHidden = isSearching || folderView.mode != .icons
+        icons.scroll.isHidden = isSearching || folderView.mode == .details
+        icons.isListView = folderView.mode == .list
         viewToggle.isEnabled = !isSearching
-        viewToggle.selectedSegment = isSearching || folderView.mode == .details ? 1 : 0
+        viewToggle.selectedSegment = isSearching ? 2 : folderView.mode == .icons ? 0 : folderView.mode == .list ? 1 : 2
         updateSizeSliderVisibility()
     }
     private func defaultColumnWidth(_ key: String) -> Double {
@@ -611,14 +634,12 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     }
     private func updateSizeSliderVisibility() {
         iconSlider.isHidden = isSearching || folderView.mode != .icons
-        spacingSlider.isHidden = iconSlider.isHidden
+        spacingSlider.isHidden = isSearching || folderView.mode == .details
     }
-    private func saveView() { if !restoringView { viewStore.save(folderView, for: current) } }
-    private func rebuildViewMenu() {
-        viewMenu.removeAllItems()
-        viewMenu.addItem(withTitle: "⋯", action: nil, keyEquivalent: "")
-        viewMenu.addItem(withTitle: "Make Current View the Default", action: #selector(makeViewDefault), keyEquivalent: "").target = self
-        viewMenu.addItem(withTitle: "Restore Default for This Folder", action: #selector(restoreViewDefault), keyEquivalent: "").target = self
+    private func saveView() {
+        guard !restoringView, let viewFolder else { return }
+        viewStore.save(folderView, for: viewFolder)
+        resetViewButton?.isEnabled = true
     }
     private func rebuildSortMenu() {
         sortMenu.removeAllItems()
@@ -637,17 +658,20 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         first.target = self; first.state = folderView.foldersFirst ? .on : .off
     }
     @objc private func changeViewSegment(_ sender: NSSegmentedControl) {
-        let mode: FolderViewMode = sender.selectedSegment == 0 ? .icons : .details
+        let mode: FolderViewMode = sender.selectedSegment == 0 ? .icons : sender.selectedSegment == 1 ? .list : .details
         folderView.mode = mode; saveView(); applyView(folderView)
-        window?.makeFirstResponder(mode == .icons ? icons.collection : table)
+        window?.makeFirstResponder(mode == .details ? table : icons.collection)
     }
     @objc private func iconSizeChanged() {
         folderView.iconSize = iconSlider.doubleValue
         icons.iconSize = iconSlider.doubleValue; saveView()
     }
     @objc private func iconSpacingChanged() {
-        folderView.iconSpacing = spacingSlider.doubleValue
-        icons.iconSpacing = spacingSlider.doubleValue; saveView()
+        let spacing = spacingSlider.doubleValue
+        if folderView.mode == .list { folderView.listSpacing = spacing }
+        else { folderView.iconSpacing = spacing }
+        icons.iconSpacing = spacing
+        saveView()
     }
     @objc private func makeViewDefault() {
         var defaults = folderView; defaults.filter = ""
@@ -670,7 +694,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         let entry = visible[row]
         let key = tableColumn!.identifier.rawValue
         let cell = NSTableCellView()
-        let label = NSTextField(labelWithString: "")
+        let label = FileNameLabel(labelWithString: "")
         label.font = .systemFont(ofSize: 12)
         label.lineBreakMode = .byTruncatingMiddle
         label.textColor = entry.isHidden ? .secondaryLabelColor : .labelColor
@@ -699,7 +723,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         return cell
     }
     private var selection: [FileEntry] {
-        let indexes = !isSearching && folderView.mode == .icons ? icons.collection.selectionIndexPaths.map(\.item).sorted() : Array(table.selectedRowIndexes)
+        let indexes = !isSearching && folderView.mode != .details ? icons.collection.selectionIndexPaths.map(\.item).sorted() : Array(table.selectedRowIndexes)
         return indexes.compactMap { visible.indices.contains($0) ? visible[$0] : nil }
     }
     @objc private func updateIndicatorChanged() {
@@ -708,52 +732,34 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         settingsButton?.setAccessibilityLabel(available ? "Settings — update available" : "Settings")
     }
     func menuNeedsUpdate(_ menu: NSMenu) {
-        if menu === viewMenu { rebuildViewMenu(); return }
         if menu === sortMenu { rebuildSortMenu(); return }
         menu.removeAllItems()
-        let actions: [(String, Selector)]
+        let groups: [[MenuAction]]
         if isTrashBrowsing {
-            actions = selection.isEmpty ? [("Clear Trash…", #selector(clearTrash)), ("Refresh", #selector(refresh))] : [("Open", #selector(openSelection)), ("Get Info", #selector(getInfo)), ("Restore", #selector(restoreTrashSelection)), ("Copy", #selector(copyFiles)), ("Copy Path", #selector(copyPath)), ("Reveal in Finder", #selector(reveal))]
+            groups = [selection.isEmpty ? [("Clear Trash…", #selector(clearTrash), nil), ("Refresh", #selector(refresh), nil)] : [("Open", #selector(openSelection), nil), ("Get Info", #selector(getInfo), nil), ("Restore", #selector(restoreTrashSelection), nil), ("Copy", #selector(copyFiles), nil), ("Copy Path", #selector(copyPath), nil), ("Reveal in Finder", #selector(reveal), nil)]]
         } else if selection.isEmpty {
-            actions = [("New Folder…", #selector(newFolder)), ("New File…", #selector(newFile)), ("Paste", #selector(pasteFiles)), ("Refresh", #selector(refresh))]
+            groups = [[("New Folder…", #selector(newFolder), nil), ("New File…", #selector(newFile), nil), ("Paste", #selector(pasteFiles), nil), ("Refresh", #selector(refresh), nil)]]
         } else {
-            actions = [("Open", #selector(openSelection)), ("Get Info", #selector(getInfo)), ("Duplicate", #selector(duplicate)), ("Copy", #selector(copyFiles)), ("Cut", #selector(cutFiles)), ("Rename…", #selector(rename)), ("Move to Trash…", #selector(trash)), ("Copy Path", #selector(copyPath)), ("Permissions…", #selector(editPermissions)), ("Reveal in Finder", #selector(reveal))]
+            groups = itemMenuGroups
         }
-        for (title, action) in actions {
-            let item = menu.addItem(withTitle: title, action: action, keyEquivalent: "")
-            item.target = self; item.isEnabled = !busy
-            if action == #selector(rename) { item.isEnabled = !busy && selection.count == 1 }
-            if action == #selector(pasteFiles) {
-                item.isEnabled = !busy && NSPasteboard.general.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
+        for (index, group) in groups.enumerated() {
+            if index > 0 { menu.addItem(.separator()) }
+            for (title, action, symbol) in group {
+                let item = menu.addItem(withTitle: title, action: action, keyEquivalent: "")
+                item.target = self; item.isEnabled = !busy
+                item.image = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
+                if action == #selector(rename) { item.isEnabled = !busy && selection.count == 1 }
+                if action == #selector(pasteFiles) {
+                    item.isEnabled = !busy && NSPasteboard.general.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
+                }
             }
         }
         if !isTrashBrowsing, !busy, selection.count == 1,
            let entry = selection.first, !entry.isDirectory,
            let openIndex = menu.items.firstIndex(where: { $0.title == "Open" }) {
-            let item = openWithMenu.makeMenuItem(
-                for: entry.url,
-                onOpen: { fileURL, applicationURL in
-                    NSWorkspace.shared.open(
-                        [fileURL],
-                        withApplicationAt: applicationURL,
-                        configuration: NSWorkspace.OpenConfiguration()
-                    )
-                },
-                onSetDefault: { [weak self] fileURL, applicationURL in
-                    NSWorkspace.shared.setDefaultApplication(
-                        at: applicationURL,
-                        toOpenContentTypeOfFileAt: fileURL
-                    ) { [weak self] error in
-                        DispatchQueue.main.async {
-                            if let error {
-                                self?.show(error)
-                            } else {
-                                self?.status.stringValue = "Default app for .\(fileURL.pathExtension) set to \(applicationURL.deletingPathExtension().lastPathComponent)."
-                            }
-                        }
-                    }
-                }
-            )
+            let item = openWithMenu.makeMenuItem(for: entry.url, defaultApplication: DefaultApplication.application(for: entry.url)) { [weak self] fileURL, applicationURL, makeDefault in
+                self?.open(fileURL, with: applicationURL, makeDefault: makeDefault)
+            }
             menu.insertItem(item, at: openIndex + 1)
         }
         if !isTrashBrowsing, selection.isEmpty {
@@ -763,6 +769,37 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             menu.addItem(.separator())
             sidebar.appendContextItems(to: menu, for: entry.url)
         }
+    }
+    /// A menu command: title, action, and the SF Symbol drawn beside it.
+    private typealias MenuAction = (title: String, action: Selector, symbol: String?)
+    /// The menu for selected items, in Finder's order, groups and icons, without the Finder features
+    /// Explorer doesn't have (Quick Look, Share, Tags, Quick Actions). Its last group has no icons,
+    /// like Finder's, and folders add their terminal and favorite commands after it.
+    private var itemMenuGroups: [[MenuAction]] {
+        let compress = selection.count == 1 ? "Compress “\(selection[0].name)”" : "Compress \(selection.count) Items"
+        // The ellipsis promises a question, so it shows only while Move to Trash asks first.
+        let trash = ConfirmationPreference.moveToTrash.isEnabled ? "Move to Trash…" : "Move to Trash"
+        return [
+            [("Open", #selector(openSelection), "arrow.up.forward.square")],
+            [(trash, #selector(self.trash), "trash")],
+            [("Get Info", #selector(getInfo), "info.circle"), ("Rename…", #selector(rename), "pencil"),
+             (compress, #selector(self.compress), "doc.zipper"), ("Duplicate", #selector(duplicate), "plus.square.on.square"),
+             ("Make Alias", #selector(makeAlias), "square.dashed"), ("Permissions…", #selector(editPermissions), "lock")],
+            [("Copy", #selector(copyFiles), "doc.on.doc"), ("Cut", #selector(cutFiles), "scissors"), ("Copy Path", #selector(copyPath), "link")],
+            [("Reveal in Finder", #selector(reveal), nil)]
+        ]
+    }
+    @objc private func compress() {
+        guard !isTrashBrowsing else { return }
+        let urls = selection.map(\.url)
+        guard let first = urls.first else { return }
+        performFileOperation { try FileSystem.compress(urls, into: first.deletingLastPathComponent()) }
+    }
+    @objc private func makeAlias() {
+        guard !isTrashBrowsing else { return }
+        let urls = selection.map(\.url)
+        guard !urls.isEmpty else { return }
+        performFileOperation { for url in urls { try FileSystem.makeAlias(url) } }
     }
     @objc private func pathEntered() {
         if ["trash", TrashStore.location.absoluteString].contains(path.stringValue.lowercased()) { navigate(TrashStore.location) }
@@ -1034,6 +1071,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         if let permissions {
             let fields = NSStackView(views: [input, permissions])
             fields.orientation = .vertical; fields.alignment = .leading; fields.spacing = 12
+            input.widthAnchor.constraint(equalTo: permissions.widthAnchor).isActive = true
             fields.frame = NSRect(x: 0, y: 0, width: permissions.fittingSize.width, height: permissions.fittingSize.height + 36)
             alert.accessoryView = fields
         } else {
@@ -1073,6 +1111,51 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
                 if case .failure(let error) = result { self.show(error) }
             }
         }
+    }
+    /// Opens `fileURL` in the chosen app. When making it the default, the open waits until macOS has
+    /// finished changing (or declined to change) the default, so the two never race.
+    private func open(_ fileURL: URL, with applicationURL: URL, makeDefault: Bool) {
+        let launch = { [weak self] in
+            NSWorkspace.shared.open([fileURL], withApplicationAt: applicationURL, configuration: NSWorkspace.OpenConfiguration()) { _, error in
+                guard let error else { return }
+                DispatchQueue.main.async { self?.show(error) }
+            }
+        }
+        guard makeDefault else { launch(); return }
+        let target = DefaultApplication.target(for: fileURL)
+        let name = fileURL.lastPathComponent
+        let app = FileManager.default.displayName(atPath: applicationURL.path).replacingOccurrences(of: ".app", with: "")
+        let finished: (Error?) -> Void = { [weak self] error in
+            guard let self else { return }
+            if let error {
+                if !Self.isCancellation(error) { self.show(error) }
+            } else {
+                let kind = target == .sameName ? "every \(name)"
+                    : fileURL.pathExtension.isEmpty ? "files like \(name)" : ".\(fileURL.pathExtension) files"
+                self.status.stringValue = target == .sameName ? "\(app) now opens \(kind). Finding other \(name) files…" : "\(app) now opens \(kind)."
+                // Document icons come from the default app, so drop icons cached under the old one.
+                FilePreviewImageView.clearCache()
+                self.table.reloadData(); self.icons.refreshItems()
+            }
+            launch()
+        }
+        if target == .sameName {
+            // macOS has no default for files with no extension, so the choice is saved on each one by name.
+            SameNameDefaults.shared.set(applicationURL, for: fileURL, saved: finished) { [weak self] count in
+                self?.status.stringValue = "\(app) now opens every \(name): \(count) other\(count == 1 ? "" : "s") in your home folder updated."
+            }
+        } else {
+            NSWorkspace.shared.setDefaultApplication(at: applicationURL, toOpenContentTypeOfFileAt: fileURL) { error in
+                DispatchQueue.main.async { finished(error) }
+            }
+        }
+    }
+    /// Declining macOS's confirmation comes back either as Cocoa's cancel or wrapped as `userCanceledErr`.
+    private static func isCancellation(_ error: Error) -> Bool {
+        let detail = error as NSError
+        if detail.domain == NSCocoaErrorDomain && detail.code == NSUserCancelledError { return true }
+        let underlying = detail.userInfo[NSUnderlyingErrorKey] as? NSError
+        return underlying?.domain == NSOSStatusErrorDomain && underlying?.code == userCanceledErr
     }
     private func show(_ error: Error) {
         guard let window else { return }

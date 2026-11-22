@@ -43,6 +43,8 @@ func checkIconSpacing() throws {
         }
     }
     mode.selectedSegment = 1; mode.sendAction(mode.action, to: mode.target)
+    try require(!spacing.isHidden && size.isHidden, "List view keeps the spacing slider and hides icon size")
+    mode.selectedSegment = 2; mode.sendAction(mode.action, to: mode.target)
     try require(spacing.isHidden && size.isHidden, "Both icon controls must hide in Details view")
     mode.selectedSegment = 0; mode.sendAction(mode.action, to: mode.target)
     try require(!spacing.isHidden && spacing.doubleValue == 40, "Switching back to Icons must restore spacing")

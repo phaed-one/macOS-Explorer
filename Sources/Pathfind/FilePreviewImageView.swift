@@ -12,6 +12,8 @@ final class FilePreviewImageView: NSImageView {
     }()
     private var request: QLThumbnailGenerator.Request?
 
+    static func clearCache() { thumbnails.removeAllObjects() }
+
     deinit {
         if let request { QLThumbnailGenerator.shared.cancel(request) }
     }
@@ -23,6 +25,11 @@ final class FilePreviewImageView: NSImageView {
         alphaValue = entry.isHidden ? 0.5 : 1
         guard !entry.isDirectory else {
             image = NSWorkspace.shared.icon(forFile: entry.url.path)
+            return
+        }
+        // Quick Look has nothing to show for a file macOS has no type for; take its default app's icon.
+        if let icon = DocumentIcon.defaultAppIcon(forFile: entry.url) {
+            image = icon
             return
         }
 
