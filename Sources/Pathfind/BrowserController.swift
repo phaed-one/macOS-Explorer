@@ -607,7 +607,8 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     private func configureTableColumns() {
         let definitions: [(String, String, Double)] = isSearching
             ? [("name", "Name", 300), ("path", "Full Path", 600)]
-            : [("name", "Name", 350), ("modified", "Date modified", 170), ("kind", "Kind", 140), ("size", "Size", 85)]
+            : [("name", "Name", 350)] + (current == TrashStore.location ? [("deleted", "Date Deleted", 170)] : [])
+                + [("modified", "Date modified", 170), ("kind", "Kind", 140), ("size", "Size", 85)]
         guard Set(table.tableColumns.map { $0.identifier.rawValue }) != Set(definitions.map { $0.0 }) else { return }
         let wasRestoring = restoringView; restoringView = true
         defer { restoringView = wasRestoring }
@@ -630,7 +631,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         updateSizeSliderVisibility()
     }
     private func defaultColumnWidth(_ key: String) -> Double {
-        ["name": 350, "modified": 170, "kind": 140, "size": 85][key] ?? 100
+        ["name": 350, "deleted": 170, "modified": 170, "kind": 140, "size": 85][key] ?? 100
     }
     private func updateSizeSliderVisibility() {
         iconSlider.isHidden = isSearching || folderView.mode != .icons
@@ -644,7 +645,9 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     private func rebuildSortMenu() {
         sortMenu.removeAllItems()
         sortMenu.addItem(withTitle: "Sort", action: nil, keyEquivalent: "")
-        for (key, label) in [(FileSort.name, "Name (Alphabetical)"), (.modified, "Date Modified"), (.kind, "Kind"), (.size, "Size")] {
+        let sorts: [(FileSort, String)] = [(.name, "Name (Alphabetical)")] + (current == TrashStore.location ? [(.deleted, "Date Deleted")] : [])
+            + [(.modified, "Date Modified"), (.kind, "Kind"), (.size, "Size")]
+        for (key, label) in sorts {
             let item = sortMenu.addItem(withTitle: label, action: #selector(changeSort(_:)), keyEquivalent: "")
             item.target = self; item.representedObject = key.rawValue; item.state = sortKey == key ? .on : .off
         }
@@ -701,6 +704,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         switch key {
         case "name": label.stringValue = entry.name
         case "modified": label.stringValue = dateFormatter.string(from: entry.modified)
+        case "deleted": label.stringValue = entry.deleted.map(dateFormatter.string(from:)) ?? "—"
         case "kind": label.stringValue = entry.kind
         case "path": label.stringValue = entry.url.path; label.toolTip = entry.url.path
         default:
@@ -793,13 +797,15 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         guard !isTrashBrowsing else { return }
         let urls = selection.map(\.url)
         guard let first = urls.first else { return }
-        performFileOperation { try FileSystem.compress(urls, into: first.deletingLastPathComponent()) }
+        let log = FileUndo.Log()
+        performFileOperation(undo: ("Compress", log)) { log.add(.created(try FileSystem.compress(urls, into: first.deletingLastPathComponent()))) }
     }
     @objc private func makeAlias() {
         guard !isTrashBrowsing else { return }
         let urls = selection.map(\.url)
         guard !urls.isEmpty else { return }
-        performFileOperation { for url in urls { try FileSystem.makeAlias(url) } }
+        let log = FileUndo.Log()
+        performFileOperation(undo: ("Make Alias", log)) { for url in urls { log.add(.created(try FileSystem.makeAlias(url))) } }
     }
     @objc private func pathEntered() {
         if ["trash", TrashStore.location.absoluteString].contains(path.stringValue.lowercased()) { navigate(TrashStore.location) }
@@ -901,7 +907,8 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         guard !isTrashBrowsing else { return }
         let urls = selection.map(\.url)
         guard !urls.isEmpty else { return }
-        performFileOperation { for url in urls { try FileSystem.duplicate(url) } }
+        let log = FileUndo.Log()
+        performFileOperation(undo: ("Duplicate", log)) { for url in urls { log.add(.created(try FileSystem.duplicate(url))) } }
     }
     @objc private func reveal() { NSWorkspace.shared.activateFileViewerSelecting(selection.isEmpty ? [current] : selection.map(\.url)) }
     @objc private func copyFiles() {
@@ -922,7 +929,8 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         guard !busy else { return }
         resolveNameConflicts(urls, into: destination) { plan in
             var remaining = plan.map(\.source)
-            self.performFileOperation(onCompletion: { _ in
+            let log = FileUndo.Log()
+            self.performFileOperation(undo: (Self.transferName(into: destination, move: moving), log), onCompletion: { _ in
                 guard moving, NSPasteboard.general.changeCount == clipboardVersion else { return }
                 NSPasteboard.general.clearContents()
                 if !remaining.isEmpty {
@@ -931,7 +939,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
                 }
             }) {
                 for (source, conflict) in plan {
-                    try self.transferOne(source, into: destination, move: moving, conflict: conflict)
+                    try self.transferOne(source, into: destination, move: moving, conflict: conflict, log: log)
                     remaining.removeFirst()
                 }
             }
@@ -940,14 +948,25 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     private func transfer(_ urls: [URL], into destination: URL, move: Bool) {
         guard !busy else { return }
         resolveNameConflicts(urls, into: destination) { plan in
-            self.performFileOperation {
-                for (url, conflict) in plan { try self.transferOne(url, into: destination, move: move, conflict: conflict) }
+            let log = FileUndo.Log()
+            self.performFileOperation(undo: (Self.transferName(into: destination, move: move), log)) {
+                for (url, conflict) in plan { try self.transferOne(url, into: destination, move: move, conflict: conflict, log: log) }
             }
         }
     }
-    private func transferOne(_ url: URL, into destination: URL, move: Bool, conflict: NameConflict) throws {
-        if destination == TrashStore.location { try trashActions.moveToTrash(url); return }
-        try FileSystem.transfer(url, into: destination, move: move, conflict: conflict) { _ = try self.trashStore.trash($0) }
+    private static func transferName(into destination: URL, move: Bool) -> String {
+        destination == TrashStore.location ? "Move to Trash" : move ? "Move" : "Copy"
+    }
+    private func transferOne(_ url: URL, into destination: URL, move: Bool, conflict: NameConflict, log: FileUndo.Log) throws {
+        if destination == TrashStore.location {
+            log.add(.trashed(original: url, inTrash: try trashActions.moveToTrash(url)))
+            return
+        }
+        // A replaced item goes to the Trash first, so undoing puts the new item back, then the old one.
+        let final = try FileSystem.transfer(url, into: destination, move: move, conflict: conflict) { replaced in
+            log.add(.trashed(original: replaced, inTrash: try self.trashStore.trash(replaced)))
+        }
+        log.add(move ? .moved(from: url, to: final) : .created(final))
     }
     /// Asks, like Finder, what to do with each name already in the destination. Skipped items are left out
     /// of the plan, and Stop cancels the whole operation.
@@ -1005,8 +1024,10 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         guard !isTrashBrowsing else { return }
         prompt("New Folder", value: "New Folder", isDirectory: true, initialMode: 0o755) { name, mode in
             let destination = self.current.appendingPathComponent(name)
-            self.performFileOperation {
+            let log = FileUndo.Log()
+            self.performFileOperation(undo: ("New Folder", log)) {
                 try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
+                log.add(.created(destination))
                 try FileSystem.setPermissions(mode, for: destination)
             }
         }
@@ -1015,8 +1036,10 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         guard !isTrashBrowsing else { return }
         prompt("New File", value: "New File.txt", isDirectory: false, initialMode: 0o644) { name, mode in
             let destination = self.current.appendingPathComponent(name)
-            self.performFileOperation {
+            let log = FileUndo.Log()
+            self.performFileOperation(undo: ("New File", log)) {
                 try Data().write(to: destination, options: .withoutOverwriting)
+                log.add(.created(destination))
                 try FileSystem.setPermissions(mode, for: destination)
             }
         }
@@ -1039,14 +1062,23 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         prompt("Rename", value: entry.name) { name in
             let destination = entry.url.deletingLastPathComponent().appendingPathComponent(name)
             guard destination != entry.url else { return }
-            self.performFileOperation { try FileManager.default.moveItem(at: entry.url, to: destination) }
+            let log = FileUndo.Log()
+            self.performFileOperation(undo: ("Rename", log)) {
+                try FileManager.default.moveItem(at: entry.url, to: destination)
+                log.add(.moved(from: entry.url, to: destination))
+            }
         }
     }
     @objc private func trash() {
         if isTrashBrowsing { restoreTrashSelection(); return }
         let urls = selection.map(\.url)
         guard !urls.isEmpty, let window else { return }
-        let moveToTrash = { self.performFileOperation { for url in urls { try self.trashActions.moveToTrash(url) } } }
+        let moveToTrash = {
+            let log = FileUndo.Log()
+            self.performFileOperation(undo: ("Move to Trash", log)) {
+                for url in urls { log.add(.trashed(original: url, inTrash: try self.trashActions.moveToTrash(url))) }
+            }
+        }
         guard ConfirmationPreference.moveToTrash.isEnabled else { moveToTrash(); return }
         let alert = NSAlert()
         alert.messageText = "Move \(urls.count) item\(urls.count == 1 ? "" : "s") to the Trash?"
@@ -1096,13 +1128,16 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         }
         return name
     }
-    private func performFileOperation(onCompletion: ((Error?) -> Void)? = nil, _ operation: @escaping () throws -> Void) {
+    /// `undo` names the operation for Edit > Undo and collects its changes; whatever finished, even if
+    /// a later item failed, becomes one undo step.
+    private func performFileOperation(undo: (name: String, log: FileUndo.Log)? = nil, onCompletion: ((Error?) -> Void)? = nil, _ operation: @escaping () throws -> Void) {
         guard !busy else { return }
         busy = true; request += 1; status.stringValue = "Working…"
         queue.async {
             let result = Result { try operation() }
             DispatchQueue.main.async {
                 self.busy = false
+                if let undo { FileUndo.shared.record(undo.log.changes, name: undo.name) }
                 let error: Error?
                 switch result { case .failure(let failure): error = failure; case .success: error = nil }
                 onCompletion?(error)
@@ -1276,7 +1311,8 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     private var filePaneHasFocus: Bool { window?.firstResponder === table || window?.firstResponder === icons.collection }
     @objc private func restoreTrashSelection() {
         guard let window, !busy else { return }
-        trashActions.restore(selection.map(\.url), on: window) { [weak self] operation in self?.performFileOperation(operation) }
+        let log = FileUndo.Log()
+        trashActions.restore(selection.map(\.url), on: window, log: log) { [weak self] operation in self?.performFileOperation(undo: ("Restore", log), operation) }
     }
     @objc private func clearTrash() {
         guard let window, !busy else { return }

@@ -36,7 +36,7 @@ public final class TrashStore {
         let entries = try directories.flatMap { directory -> [FileEntry] in
             do { return try FileSystem.contents(of: directory, showHidden: true) }
             catch let error as NSError where error.domain == NSCocoaErrorDomain && [NSFileReadNoSuchFileError, NSFileNoSuchFileError].contains(error.code) { return [] }
-        }.filter { !Self.isMetadata($0.name) }
+        }.filter { !Self.isMetadata($0.name) }.map { $0.withDeleted(Self.deletionDate($0.url)) }
         let live = Set(entries.map { $0.url.standardizedFileURL.path })
         lock.lock()
         let saved = records
@@ -97,6 +97,12 @@ public final class TrashStore {
         lock.lock(); var saved = records
         for entry in entries { saved.removeValue(forKey: entry.url.standardizedFileURL.path) }
         records = saved; lock.unlock()
+    }
+    /// When an item went into the Trash: the date it was added to the Trash folder, which Finder shows as
+    /// Date Added. Moving an item also updates its attribute change date, so that stands in when missing.
+    static func deletionDate(_ url: URL) -> Date? {
+        let values = try? url.resourceValues(forKeys: [.addedToDirectoryDateKey, .attributeModificationDateKey])
+        return values?.addedToDirectoryDate ?? values?.attributeModificationDate
     }
     private static func isMetadata(_ name: String) -> Bool { [".DS_Store", ".localized"].contains(name) }
     private static func failure(_ message: String) -> NSError { NSError(domain: "Pathfind", code: 3, userInfo: [NSLocalizedDescriptionKey: message]) }

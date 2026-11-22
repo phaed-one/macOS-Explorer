@@ -359,6 +359,21 @@ final class BrowserWindow: NSWindow {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+    /// Text being edited keeps its own typing undo; everywhere else, Undo reverses file operations.
+    override var undoManager: UndoManager? {
+        firstResponder is NSText ? super.undoManager : FileUndo.shared.manager
+    }
+    // NSWindow's own Undo and Redo use its private undo manager, not the one above, so handle them here.
+    @objc func undo(_ sender: Any?) { undoManager?.undo() }
+    @objc func redo(_ sender: Any?) { undoManager?.redo() }
+    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        guard let manager = undoManager, [#selector(undo(_:)), #selector(redo(_:))].contains(item.action) else {
+            return super.validateUserInterfaceItem(item)
+        }
+        let undoing = item.action == #selector(undo(_:))
+        (item as? NSMenuItem)?.title = undoing ? manager.undoMenuItemTitle : manager.redoMenuItemTitle
+        return undoing ? manager.canUndo : manager.canRedo
+    }
     // perform* expects titlebar-owned buttons; the custom frame has none.
     override func performClose(_ sender: Any?) { close() }
     override func performMiniaturize(_ sender: Any?) { miniaturize(sender) }

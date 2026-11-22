@@ -69,6 +69,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SettingsPresenting, Se
         let editItem = NSMenuItem()
         menu.addItem(editItem)
         let edit = NSMenu(title: "Edit")
+        // The window gives these its undo stack, so their titles name the step ("Undo Move to Trash").
+        edit.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        edit.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        edit.addItem(.separator())
         for (name, action, key) in [("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a")] {
             edit.addItem(withTitle: name, action: Selector(action), keyEquivalent: key)
         }

@@ -22,7 +22,14 @@ public struct FolderViewPreferences: Codable, Equatable, Sendable {
 /// Explicit folder overrides inherit the default only until the user customizes them.
 public final class FolderViewStore {
     private let defaults: UserDefaults
-    public init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+    public init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        // Once, so the Trash starts from its own default rather than a view saved before it had one.
+        if !defaults.bool(forKey: "trashViewDefaultApplied") {
+            restoreDefault(for: TrashStore.location)
+            defaults.set(true, forKey: "trashViewDefaultApplied")
+        }
+    }
     private var overrides: [String: FolderViewPreferences] {
         guard let data = defaults.data(forKey: "folderViews"),
               let views = try? JSONDecoder().decode([String: FolderViewPreferences].self, from: data) else { return [:] }
@@ -33,7 +40,21 @@ public final class FolderViewStore {
               let view = try? JSONDecoder().decode(FolderViewPreferences.self, from: data) else { return .init() }
         return view
     }
-    public func view(for folder: URL) -> FolderViewPreferences { overrides[folder.folderPreferenceKey] ?? defaultView }
+    public func view(for folder: URL) -> FolderViewPreferences {
+        if let saved = overrides[folder.folderPreferenceKey] { return saved }
+        return folder == TrashStore.location ? Self.trashView(from: defaultView) : defaultView
+    }
+    /// The Trash, like Finder's: details with a Date Deleted column, most recently deleted first,
+    /// folders mixed in by date. Icon sizes and spacing follow the default view.
+    public static func trashView(from base: FolderViewPreferences) -> FolderViewPreferences {
+        var view = base
+        view.mode = .details
+        view.sort = .deleted; view.ascending = false
+        view.foldersFirst = false
+        view.filter = ""
+        view.columnOrder = ["name", "deleted", "modified", "kind", "size"]
+        return view
+    }
     public func hasOverride(for folder: URL) -> Bool { overrides[folder.folderPreferenceKey] != nil }
     public func save(_ view: FolderViewPreferences, for folder: URL) {
         var views = overrides
@@ -41,6 +62,10 @@ public final class FolderViewStore {
         defaults.set(try? JSONEncoder().encode(views), forKey: "folderViews")
     }
     public func makeDefault(_ view: FolderViewPreferences) {
+        var view = view
+        // Only the Trash has a Date Deleted column, so other folders sort by date modified instead.
+        if view.sort == .deleted { view.sort = .modified }
+        view.columnOrder.removeAll { $0 == "deleted" }
         defaults.set(try? JSONEncoder().encode(view), forKey: "defaultFolderView")
     }
     public func restoreDefault(for folder: URL) {

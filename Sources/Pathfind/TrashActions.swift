@@ -7,9 +7,11 @@ final class TrashActions {
     init(store: TrashStore) { self.store = store }
     typealias Perform = (@escaping () throws -> Void) -> Void
 
-    func moveToTrash(_ url: URL) throws {
+    /// Returns the item's location in the Trash.
+    @discardableResult
+    func moveToTrash(_ url: URL) throws -> URL {
         try quitRunningApp(at: url)
-        try store.trash(url)
+        return try store.trash(url)
     }
 
     // Runs on the file-operation queue so the main run loop can receive termination updates.
@@ -41,13 +43,14 @@ final class TrashActions {
         }
     }
 
-    func restore(_ urls: [URL], on window: NSWindow, perform: @escaping Perform) {
+    /// Each restored item is added to `log`, so restoring can be undone.
+    func restore(_ urls: [URL], on window: NSWindow, log: FileUndo.Log, perform: @escaping Perform) {
         guard !urls.isEmpty else { return }
         DispatchQueue.global(qos: .userInitiated).async {
             let destinations = Dictionary(uniqueKeysWithValues: urls.compactMap { url in self.store.originalURL(for: url).map { (url, $0) } })
             DispatchQueue.main.async {
                 if destinations.count == urls.count {
-                    perform { for url in urls { try self.store.restore(url, to: destinations[url]) } }
+                    perform { for url in urls { try self.restore(url, to: destinations[url]!, log: log) } }
                     return
                 }
                 let panel = NSOpenPanel()
@@ -59,11 +62,15 @@ final class TrashActions {
                 panel.beginSheetModal(for: window) { response in
                     guard response == .OK, let folder = panel.url else { return }
                     perform {
-                        for url in urls { try self.store.restore(url, to: destinations[url] ?? folder.appendingPathComponent(url.lastPathComponent)) }
+                        for url in urls { try self.restore(url, to: destinations[url] ?? folder.appendingPathComponent(url.lastPathComponent), log: log) }
                     }
                 }
             }
         }
+    }
+    private func restore(_ url: URL, to destination: URL, log: FileUndo.Log) throws {
+        try store.restore(url, to: destination)
+        log.add(.created(destination))
     }
     func clear(on window: NSWindow, perform: @escaping Perform) {
         guard ConfirmationPreference.clearTrash.isEnabled else { perform { try self.store.clear() }; return }

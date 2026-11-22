@@ -370,6 +370,8 @@ do {
     try checkDefaultApplicationTargets()
     try checkDocumentIcons()
     try checkCompressAndAlias()
+    try checkTrashView()
+    try checkFileUndo()
     try checkSelectionStatus()
     try checkFilePreviews()
     try checkFileDropNoOps()

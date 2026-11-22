@@ -18,6 +18,11 @@ public final class HiddenFileStore {
             var saved = overrides; saved["/"] = true; overrides = saved
             defaults.set(true, forKey: "filesystemShowHiddenDefaultApplied")
         }
+        // The Trash gets its own setting, showing hidden files, so trashed dotfiles stay findable.
+        if !defaults.bool(forKey: "trashShowHiddenDefaultApplied") {
+            var saved = overrides; saved[TrashStore.location.folderPreferenceKey] = true; overrides = saved
+            defaults.set(true, forKey: "trashShowHiddenDefaultApplied")
+        }
     }
     private var overrides: [String: Bool] {
         get { defaults.data(forKey: "folderHiddenFiles").flatMap { try? JSONDecoder().decode([String: Bool].self, from: $0) } ?? [:] }

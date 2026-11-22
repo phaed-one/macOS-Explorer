@@ -7,9 +7,14 @@ public struct FileEntry: Sendable {
     public let size: Int64
     public let modified: Date
     public let kind: String
-    public init(url: URL, isDirectory: Bool, isHidden: Bool, size: Int64, modified: Date, kind: String) {
+    /// When the item went into the Trash; nil outside it.
+    public let deleted: Date?
+    public init(url: URL, isDirectory: Bool, isHidden: Bool, size: Int64, modified: Date, kind: String, deleted: Date? = nil) {
         self.url = url; self.isDirectory = isDirectory; self.isHidden = isHidden
-        self.size = size; self.modified = modified; self.kind = kind
+        self.size = size; self.modified = modified; self.kind = kind; self.deleted = deleted
+    }
+    public func withDeleted(_ date: Date?) -> FileEntry {
+        FileEntry(url: url, isDirectory: isDirectory, isHidden: isHidden, size: size, modified: modified, kind: kind, deleted: date)
     }
     public var name: String { url.lastPathComponent }
     public var isBrowsableFolder: Bool {
@@ -21,6 +26,8 @@ public struct FileEntry: Sendable {
 
 public enum FileSort: String, CaseIterable, Sendable, Codable {
     case name, modified, kind, size
+    /// Date Deleted, which only Trash items have.
+    case deleted
 }
 
 /// What a transfer does when the destination folder already has an item with the same name.
@@ -119,8 +126,10 @@ public enum FileSystem {
         }
     }
     /// `trash` disposes of an item being replaced, so a replaced item stays recoverable.
+    /// Returns where the item ended up.
+    @discardableResult
     public static func transfer(_ source: URL, into directory: URL, move: Bool, conflict: NameConflict = .fail,
-                                trash: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }) throws {
+                                trash: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }) throws -> URL {
         var destination = directory.appendingPathComponent(source.lastPathComponent)
         let originalPath = source.resolvingSymlinksInPath().path
         let targetPath = destination.resolvingSymlinksInPath().path
@@ -138,11 +147,12 @@ public enum FileSystem {
                     throw NSError(domain: "Pathfind", code: 2, userInfo: [NSLocalizedDescriptionKey: "“\(destination.lastPathComponent)” can’t be replaced because it contains the item being \(move ? "moved" : "copied")."])
                 }
                 try replace(destination, with: source, move: move, trash: trash)
-                return
+                return destination
             }
         }
         if move { try FileManager.default.moveItem(at: source, to: destination) }
         else { try FileManager.default.copyItem(at: source, to: destination) }
+        return destination
     }
     /// Stages the new item beside the target first, so a failed copy never costs the existing item.
     private static func replace(_ target: URL, with source: URL, move: Bool, trash: (URL) throws -> Void) throws {
@@ -191,6 +201,7 @@ public enum FileSystem {
             case .kind: result = a.kind.localizedStandardCompare(b.kind)
             case .size: result = a.size == b.size ? .orderedSame : (a.size < b.size ? .orderedAscending : .orderedDescending)
             case .modified: result = a.modified.compare(b.modified)
+            case .deleted: result = (a.deleted ?? .distantPast).compare(b.deleted ?? .distantPast)
             }
             let order = result == .orderedSame ? a.name.localizedStandardCompare(b.name) : result
             return ascending ? order == .orderedAscending : order == .orderedDescending
