@@ -4,16 +4,16 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
   <channel>
     <title>Explorer Updates</title>
     <item>
-      <title>Explorer 0.2.11</title>
-      <pubDate>Sun, 22 Nov 2026 16:46:33 +0000</pubDate>
-      <link>https://github.com/phaed-one/macOS-Explorer/releases/tag/v0.2.11</link>
-      <sparkle:version>48</sparkle:version>
-      <sparkle:shortVersionString>0.2.11</sparkle:shortVersionString>
+      <title>Explorer 0.2.12</title>
+      <pubDate>Sun, 22 Nov 2026 19:51:20 +0000</pubDate>
+      <link>https://github.com/phaed-one/macOS-Explorer/releases/tag/v0.2.12</link>
+      <sparkle:version>68</sparkle:version>
+      <sparkle:shortVersionString>0.2.12</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://phaed-one.github.io/macOS-Explorer/archives/Explorer-0.2.11-build48.zip" length="1888053" type="application/octet-stream" sparkle:edSignature="c5RGTHbQVvEYWBEFAyzuQBzqQnGGGSwxBv1fxq8g3lfc+GnHtiKZWJXdQhTY5iqzGZU9NEJtILJpbou6Z1wrAQ==" sparkle:os="macos"></enclosure>
+      <enclosure url="https://phaed-one.github.io/macOS-Explorer/archives/Explorer-0.2.12-build68.zip" length="1951555" type="application/octet-stream" sparkle:edSignature="XDYdfrcC5Byamx8PWjdzsSRDJxie8BPbDF68RQvby2J31NiAHOAWx98JAKOErOV7wYBwLfB1/XqmphMgrdmGBg==" sparkle:os="macos"></enclosure>
     </item>
   </channel>
 </rss><!-- sparkle-signatures:
-edSignature: oCaHI/5khrMHuggFPp51YQmnAj0wgTG+yNLVP/O/NJfV96EZmAiSjhGZVDX4z9AnA8/94l4iww9cz7Oi0ss3Cg==
+edSignature: Wq4NT+ASUQZuUFJREadgQbDFQPrKvu7eTLoAv31vIxUPB2CBXRWtyT7dV+xYIS1+RkJnGVb2z1AMXCx8YqmdAQ==
 length: 1128
 -->
