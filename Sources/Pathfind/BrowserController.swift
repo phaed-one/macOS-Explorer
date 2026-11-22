@@ -72,6 +72,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     private let iconSlider = LiveSlider(value: 64, minValue: 32, maxValue: 160, target: nil, action: nil)
     private let spacingSlider = LiveSlider(value: 10, minValue: 0, maxValue: 40, target: nil, action: nil)
     private let viewMenu = NSMenu(), sortMenu = NSMenu()
+    private let openWithMenu = OpenWithMenu()
     private let viewToggle = NSSegmentedControl()
     private let viewStore = FolderViewStore()
     private let hiddenFiles = HiddenFileStore()
@@ -725,6 +726,35 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             if action == #selector(pasteFiles) {
                 item.isEnabled = !busy && NSPasteboard.general.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
             }
+        }
+        if !isTrashBrowsing, !busy, selection.count == 1,
+           let entry = selection.first, !entry.isDirectory,
+           let openIndex = menu.items.firstIndex(where: { $0.title == "Open" }) {
+            let item = openWithMenu.makeMenuItem(
+                for: entry.url,
+                onOpen: { fileURL, applicationURL in
+                    NSWorkspace.shared.open(
+                        [fileURL],
+                        withApplicationAt: applicationURL,
+                        configuration: NSWorkspace.OpenConfiguration()
+                    )
+                },
+                onSetDefault: { [weak self] fileURL, applicationURL in
+                    NSWorkspace.shared.setDefaultApplication(
+                        at: applicationURL,
+                        toOpenContentTypeOfFileAt: fileURL
+                    ) { [weak self] error in
+                        DispatchQueue.main.async {
+                            if let error {
+                                self?.show(error)
+                            } else {
+                                self?.status.stringValue = "Default app for .\(fileURL.pathExtension) set to \(applicationURL.deletingPathExtension().lastPathComponent)."
+                            }
+                        }
+                    }
+                }
+            )
+            menu.insertItem(item, at: openIndex + 1)
         }
         if !isTrashBrowsing, selection.isEmpty {
             TerminalLauncher.shared.appendItem(to: menu, folder: current)

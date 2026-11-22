@@ -51,6 +51,7 @@ const body = `### What’s new
 - The path breadcrumb now includes the current folder and keeps parent navigation available.
 - New folder and file dialogs let you set POSIX permissions with access checkboxes or octal and symbolic modes.
 - New folders default to 0755 and new files to 0644; the selected mode is applied when the item is created.
+- Right-click a file to choose an app from a filterable Open With menu or set it as the default for its file type.
 
 ### Updates
 
