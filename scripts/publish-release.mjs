@@ -48,9 +48,9 @@ const terminals = [...source.matchAll(/case \.\w+: return "([^"]+)"/g)].map(matc
 if (terminals.length !== 14) throw new Error('Review the terminal catalog before publishing release notes');
 const body = `### What’s new
 
-- The footer now shows the size of a selected file or the combined size of multiple selected files.
-- Selections containing any folder show the selection count without a size.
-- Selection sizes appear in both Details and Icons views, including search results.
+- The path breadcrumb now includes the current folder and keeps parent navigation available.
+- New folder and file dialogs let you set POSIX permissions with access checkboxes or octal and symbolic modes.
+- New folders default to 0755 and new files to 0644; the selected mode is applied when the item is created.
 
 ### Updates
 

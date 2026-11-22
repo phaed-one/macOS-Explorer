@@ -405,6 +405,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             let next = location.deletingLastPathComponent()
             parent = isTrashBrowsing && trashStore.isRoot(next) ? TrashStore.location : next
         }
+        ancestors.append(current)
         ancestorPathBar.update(ancestors)
         contentPane.headerHeight = 40
     }
@@ -935,16 +936,22 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     }
     @objc private func newFolder() {
         guard !isTrashBrowsing else { return }
-        prompt("New Folder", value: "New Folder") { name in
+        prompt("New Folder", value: "New Folder", isDirectory: true, initialMode: 0o755) { name, mode in
             let destination = self.current.appendingPathComponent(name)
-            self.performFileOperation { try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false) }
+            self.performFileOperation {
+                try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
+                try FileSystem.setPermissions(mode, for: destination)
+            }
         }
     }
     @objc private func newFile() {
         guard !isTrashBrowsing else { return }
-        prompt("New File", value: "New File.txt") { name in
+        prompt("New File", value: "New File.txt", isDirectory: false, initialMode: 0o644) { name, mode in
             let destination = self.current.appendingPathComponent(name)
-            self.performFileOperation { try Data().write(to: destination, options: .withoutOverwriting) }
+            self.performFileOperation {
+                try Data().write(to: destination, options: .withoutOverwriting)
+                try FileSystem.setPermissions(mode, for: destination)
+            }
         }
     }
     @objc private func editPermissions() {
@@ -983,20 +990,43 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             moveToTrash()
         }
     }
+    private func prompt(_ title: String, value: String, isDirectory: Bool, initialMode: UInt16, completion: @escaping (String, UInt16) -> Void) {
+        let permissions = CreatePermissionsView(initialMode: initialMode, isDirectory: isDirectory)
+        prompt(title, value: value, permissions: permissions) { name in completion(name, permissions.mode) }
+    }
     private func prompt(_ title: String, value: String, completion: @escaping (String) -> Void) {
+        prompt(title, value: value, permissions: nil, completion: completion)
+    }
+    private func prompt(_ title: String, value: String, permissions: CreatePermissionsView?, completion: @escaping (String) -> Void) {
         guard let window, !busy else { return }
         let alert = NSAlert(); alert.messageText = title
         let input = NSTextField(string: value); input.frame = NSRect(x: 0, y: 0, width: 320, height: 24)
-        alert.accessoryView = input; alert.addButton(withTitle: "Save"); alert.addButton(withTitle: "Cancel")
+        if let permissions {
+            let fields = NSStackView(views: [input, permissions])
+            fields.orientation = .vertical; fields.alignment = .leading; fields.spacing = 12
+            fields.frame = NSRect(x: 0, y: 0, width: permissions.fittingSize.width, height: permissions.fittingSize.height + 36)
+            alert.accessoryView = fields
+        } else {
+            alert.accessoryView = input
+        }
+        alert.addButton(withTitle: "Save"); alert.addButton(withTitle: "Cancel")
+        if let permissions {
+            permissions.onValidityChange = { [weak alert] in alert?.buttons.first?.isEnabled = $0 }
+        }
         alert.window.initialFirstResponder = input
         alert.beginGlassSheetModal(for: window) { response in
             guard response == .alertFirstButtonReturn else { return }
-            let name = input.stringValue
-            guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains("\0") else {
-                self.show(NSError(domain: "Pathfind", code: 1, userInfo: [NSLocalizedDescriptionKey: "Enter a filename without a slash. ‘.’ and ‘..’ are reserved."])); return
-            }
+            guard let name = self.itemName(from: input) else { return }
             completion(name)
         }
+    }
+    private func itemName(from input: NSTextField) -> String? {
+        let name = input.stringValue
+        guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains("\0") else {
+            show(NSError(domain: "Pathfind", code: 1, userInfo: [NSLocalizedDescriptionKey: "Enter a filename without a slash. ‘.’ and ‘..’ are reserved."]))
+            return nil
+        }
+        return name
     }
     private func performFileOperation(onCompletion: ((Error?) -> Void)? = nil, _ operation: @escaping () throws -> Void) {
         guard !busy else { return }

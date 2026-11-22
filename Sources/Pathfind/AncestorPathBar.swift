@@ -28,11 +28,11 @@ final class AncestorPathBar: NSView {
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    func update(_ ancestors: [URL]) {
-        locations = ancestors
-        parentButton.isEnabled = !ancestors.isEmpty
+    func update(_ path: [URL]) {
+        locations = path
+        parentButton.isEnabled = path.count > 1
         buttons.forEach { $0.removeFromSuperview() }
-        buttons = ancestors.enumerated().map { index, location in
+        buttons = path.enumerated().map { index, location in
             let title = location == TrashStore.location ? "Trash" : location.path == "/" ? "/" : location.lastPathComponent
             let button = NSButton(title: title, target: self, action: #selector(openAncestor))
             button.bezelStyle = .rounded
@@ -67,7 +67,8 @@ final class AncestorPathBar: NSView {
         onNavigate?(locations[sender.tag])
     }
     @objc private func openParent() {
-        guard let parent = locations.last else { return }
+        guard locations.count > 1 else { return }
+        let parent = locations[locations.count - 2]
         onNavigate?(parent)
     }
 }
