@@ -48,20 +48,11 @@ const terminals = [...source.matchAll(/case \.\w+: return "([^"]+)"/g)].map(matc
 if (terminals.length !== 14) throw new Error('Review the terminal catalog before publishing release notes');
 const body = `### What’s new
 
-- **A clearer toolbar.** Controls sit in captioned groups: New, Edit, View, Sort, This folder, Favorite, Server and Settings. Every option is one click away.
-- **Sort in one click** with Name, Date, Size and Kind. Click the selected one again, or the arrow beside it, to reverse the order. The folder button keeps folders above files.
-- **One eye button for hidden files** in the current folder. ⇧⌘. still changes the default for all folders.
-- **Reset** returns a folder to the default view. The menu beside it makes this folder’s view the default for all folders.
-- Selected buttons are solid blue, and tracks, sliders and separators are easier to see in dark mode.
+- **Hidden items first.** Sorting by name puts dot folders and files at the top, in either direction.
 
 ### Updates
 
 An orange dot on Settings tells you when a new version is available. Open Settings and click **Update** to install it and restart Explorer.
-
-### Terminal support
-
-Right-click a folder or empty space to open a terminal in that folder. Explorer offers your installed terminal apps:
-${terminals.map(terminal => `- ${terminal}`).join('\n')}
 
 ### Requirements
 

@@ -53,7 +53,8 @@ no keys or accounts, and it doesn't change the version or create release files.
 
 - **Build without installing:** run `zsh scripts/build-from-source.sh`. The app
   is saved as `build/Explorer.app`.
-- **Update a source build:** run `git pull`, then run the script again.
+- **Update a source build:** source builds don't check for updates. Run `git pull`,
+  then run the script again.
 - **Keep permissions across rebuilds:** run `zsh scripts/setup-signing.sh` once
   before building. It creates a signing identity in your Keychain. Without it,
   each build is signed ad hoc, and macOS asks again for permissions such as

@@ -195,6 +195,8 @@ public enum FileSystem {
     public static func sorted(_ entries: [FileEntry], by key: FileSort, ascending: Bool, foldersFirst: Bool = true) -> [FileEntry] {
         entries.sorted { a, b in
             if foldersFirst && a.isDirectory != b.isDirectory { return a.isDirectory }
+            // By name, dot items (hidden files and folders) lead in both directions.
+            if key == .name, a.name.hasPrefix(".") != b.name.hasPrefix(".") { return a.name.hasPrefix(".") }
             let result: ComparisonResult
             switch key {
             case .name: result = a.name.localizedStandardCompare(b.name)

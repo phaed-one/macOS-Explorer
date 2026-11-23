@@ -30,6 +30,9 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Framewor
 ditto "$BIN_DIR/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
 cp "$BIN_DIR/Explorer" "$APP/Contents/MacOS/Explorer"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+# Source builds don't update themselves: no update feed, no update checks, no Updates in Settings.
+/usr/libexec/PlistBuddy -c "Delete :SUFeedURL" -c "Set :SUEnableAutomaticChecks false" \
+    -c "Add :ExplorerSourceBuild bool true" "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 # A persistent identity keeps macOS permissions (such as Full Disk Access) across rebuilds.

@@ -202,6 +202,17 @@ func checkOptionalFolderGrouping() throws {
         try expect(FileSystem.sorted(entries, by: .name, ascending: true, foldersFirst: true).map(\.name) == ["Z folder", "A file"], "Folders First can be enabled")
     }
 }
+func checkDotNamesSortFirst() throws {
+    try fixture { root in
+        for folder in ["apps", ".vscode", "_build", ".agents"] {
+            try FileManager.default.createDirectory(at: root.appendingPathComponent(folder), withIntermediateDirectories: false)
+        }
+        for file in ["README.md", ".env", "_notes.txt", ".DS_Store"] { try Data().write(to: root.appendingPathComponent(file)) }
+        let entries = try FileSystem.contents(of: root, showHidden: true)
+        try expect(FileSystem.sorted(entries, by: .name, ascending: true).map(\.name) == [".agents", ".vscode", "_build", "apps", ".DS_Store", ".env", "_notes.txt", "README.md"], "Dot folders and files sort first by name, folders still on top")
+        try expect(FileSystem.sorted(entries, by: .name, ascending: false).map(\.name) == [".vscode", ".agents", "apps", "_build", ".env", ".DS_Store", "README.md", "_notes.txt"], "Dot items stay first when the name order is reversed")
+    }
+}
 func checkTabSessions() throws {
     let suite = "PathfindTabChecks.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suite)!
@@ -274,6 +285,7 @@ let checks: [(String, () throws -> Void)] = [
     ("Tab transfer preserves identity and history", checkTabTransfer),
     ("chmod parsing and permissions", checkPermissionModes),
     ("Optional folder grouping", checkOptionalFolderGrouping),
+    ("Dot names sort first", checkDotNamesSortFirst),
     ("Tab sessions and independent history", checkTabSessions),
     ("Independent tree branch expansion", checkTreeBranchMemory)
 ]

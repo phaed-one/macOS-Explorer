@@ -5,6 +5,9 @@ import Sparkle
 @MainActor final class AppUpdater: NSObject, SPUUpdaterDelegate {
     static let shared = AppUpdater()
     static let changed = Notification.Name("ExplorerUpdateStateChanged")
+    /// Builds made with scripts/build-from-source.sh set ExplorerSourceBuild. They never
+    /// contact the update feed, so an official release can't replace someone's own build.
+    static var isEnabled: Bool { Bundle.main.object(forInfoDictionaryKey: "ExplorerSourceBuild") as? Bool != true }
     enum State: Equatable {
         case idle, checking, current, available(String), installing, failed(String)
         var hasUpdate: Bool { if case .available = self { return true }; return self == .installing }
@@ -16,7 +19,7 @@ import Sparkle
     private lazy var driver = SPUStandardUserDriver(hostBundle: .main, delegate: nil)
     private lazy var updater = SPUUpdater(hostBundle: .main, applicationBundle: .main, userDriver: driver, delegate: self)
     func start() {
-        guard !started else { return }
+        guard Self.isEnabled, !started else { return }
         do {
             // Apply before startup can schedule a request, overriding any older saved opt-in.
             updater.sendsSystemProfile = false
@@ -26,13 +29,14 @@ import Sparkle
         } catch { state = .failed(error.localizedDescription) }
     }
     func checkQuietly() {
+        guard Self.isEnabled else { return }
         guard started else { start(); return }
         guard !updater.sessionInProgress else { return }
         state = .checking
         updater.checkForUpdateInformation()
     }
     func installUpdate() {
-        guard started, updater.canCheckForUpdates else { return }
+        guard Self.isEnabled, started, updater.canCheckForUpdates else { return }
         updater.checkForUpdates()
     }
     func allowedSystemProfileKeys(for updater: SPUUpdater) -> [String]? { [] }
@@ -75,6 +79,12 @@ import Sparkle
     func render(_ state: AppUpdater.State) {
         action.isEnabled = true; action.title = "Check for Updates"
         message.toolTip = nil
+        // A source build never checks; the card stays, greyed out, and says how to update.
+        guard AppUpdater.isEnabled else {
+            message.stringValue = "Updates are off in source builds. To update, pull and build again."
+            action.isEnabled = false
+            return
+        }
         switch state {
         case .idle: message.stringValue = "Explorer checks quietly for updates when it starts."
         case .checking: message.stringValue = "Checking for updates…"; action.isEnabled = false
