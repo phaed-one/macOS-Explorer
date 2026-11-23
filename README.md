@@ -48,8 +48,7 @@ cd macOS-Explorer
 zsh scripts/build-from-source.sh --install
 ```
 
-The script compiles Explorer, puts it in **Applications** and opens it. It needs
-no keys or accounts.
+The script compiles Explorer, puts it in **Applications** and opens it.
 
 - **Build without installing:** run `zsh scripts/build-from-source.sh`. The app
   is saved as `build/Explorer.app`.
