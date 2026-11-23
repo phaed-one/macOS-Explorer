@@ -102,7 +102,8 @@ func checkFavoriteAndVisibilityControls() throws {
     try require(!star.isEnabled, "Deselecting the folder must dim Favorite")
     mode.selectedSegment = 2; mode.sendAction(mode.action, to: mode.target)
     let localEye = all.compactMap { $0 as? NSButton }.first { $0.action == NSSelectorFromString("toggleFolderHidden") }!
-    let globalEye = all.compactMap { $0 as? NSButton }.first { $0.action == NSSelectorFromString("toggleHidden") }!
+    try require(!all.compactMap({ $0 as? NSButton }).contains { $0.action == NSSelectorFromString("toggleHidden") }, "The toolbar must have one eye button, for this folder")
+    let reset = all.compactMap { $0 as? NSButton }.first { $0.action == NSSelectorFromString("restoreViewDefault") }!
     localEye.performClick(nil)
     try waitUntil { table.numberOfRows == 3 }
     browser.navigate(b)
@@ -115,13 +116,13 @@ func checkFavoriteAndVisibilityControls() throws {
     browser.navigate(a)
     try waitUntil { browser.window?.representedURL == a && table.numberOfRows == 3 }
     try require(localEye.state == .on, "Returning to A must restore its visibility choice")
-    globalEye.performClick(nil)
+    NSApp.sendAction(NSSelectorFromString("toggleHidden"), to: browser, from: nil)
     browser.navigate(b)
     try waitUntil { browser.window?.representedURL == b && table.numberOfRows == 2 }
     localEye.performClick(nil)
     try waitUntil { table.numberOfRows == 1 }
-    let inherit = localEye.menu!.items.first!
-    NSApp.sendAction(inherit.action!, to: inherit.target, from: inherit)
+    try require(reset.isEnabled, "A folder's own hidden-file choice must enable Reset")
+    reset.performClick(nil)
     try waitUntil { table.numberOfRows == 2 }
     let restarted = BrowserController(tabs: BrowserTabs(url: a))
     defer { restarted.window?.close() }
@@ -145,4 +146,65 @@ func checkFavoriteAndVisibilityControls() throws {
     try waitUntil { browser.window?.representedURL?.path == "/" }
     try require(!up.isEnabled && ancestorButtons().map(\.title) == ["/"], "At the filesystem root the path is just / and parent navigation is disabled")
     print("PASS: Favorite states, per-folder visibility, ancestor navigation in both views, simplified toolbar, and one-second tooltips")
+}
+
+func checkSortChipsAndFolderDefaults() throws {
+    let defaults = UserDefaults.standard
+    let keys = ["defaultShowHiddenFiles", "folderHiddenFiles", "folderViews", "defaultFolderView"]
+    let saved = Dictionary(uniqueKeysWithValues: keys.map { ($0, defaults.object(forKey: $0)) })
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("ExplorerSortChecks-" + UUID().uuidString)
+    let a = root.appendingPathComponent("A")
+    try FileManager.default.createDirectory(at: a.appendingPathComponent("Folder"), withIntermediateDirectories: true)
+    try Data(count: 10).write(to: a.appendingPathComponent("a.txt"))
+    try Data(count: 500).write(to: a.appendingPathComponent("b.txt"))
+    try Data().write(to: a.appendingPathComponent(".hidden"))
+    defer {
+        for key in keys {
+            if let value = saved[key] ?? nil { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
+        }
+        try? FileManager.default.removeItem(at: root)
+    }
+    let visibility = HiddenFileStore()
+    visibility.defaultShowsHidden = false; visibility.set(true, for: a)
+    let store = FolderViewStore()
+    store.restoreDefault(for: a)
+    let browser = BrowserController(tabs: BrowserTabs(url: a))
+    browser.showWindow(nil); defer { browser.window?.close() }
+    try waitUntil { browser.window?.representedURL == a }
+    let all = descendants(browser.window!.contentView!)
+    let buttons = all.compactMap { $0 as? NSButton }
+    func button(_ action: String) -> NSButton { buttons.first { $0.action == NSSelectorFromString(action) }! }
+    try require(!all.contains { $0 is NSPopUpButton }, "The toolbar must have no pull-down menus")
+    let captions = all.compactMap { ($0 as? NSTextField)?.stringValue }
+    try require(["New", "Edit", "View", "Sort", "This folder", "Favorite", "Server", "Settings"].allSatisfy(captions.contains), "Each toolbar group must have a caption")
+    let chips = all.compactMap { $0 as? SortChipButton }.filter { $0.action == NSSelectorFromString("changeSortChip:") }
+    try require(chips.map(\.title) == ["Name", "Date", "Size", "Kind"] && chips.map(\.isSelected) == [true, false, false, false], "Sort chips must show Name, Date, Size, and Kind, with Name selected")
+    try require(chips.allSatisfy { $0.frame.width >= ceil(($0.title as NSString).size(withAttributes: [.font: SortChipButton.font]).width) + 8 }, "Chip labels must fit without truncation")
+    chips[2].performClick(nil)
+    try require(store.view(for: a).sort == .size && store.view(for: a).ascending && chips[2].isSelected && !chips[0].isSelected, "One click on a chip must sort by it")
+    chips[2].performClick(nil)
+    try require(!store.view(for: a).ascending, "Clicking the selected chip again must reverse the order")
+    button("toggleSortDirection").performClick(nil)
+    try require(store.view(for: a).ascending && button("toggleSortDirection").accessibilityLabel() == "Sort ascending", "The arrow must flip the order and say which way it sorts")
+    let foldersFirst = button("toggleFoldersFirst")
+    try require(foldersFirst.state == .on, "Folders first must show its state")
+    foldersFirst.performClick(nil)
+    try require(!store.view(for: a).foldersFirst && foldersFirst.state == .off, "Folders first must toggle in one click")
+    let reset = button("restoreViewDefault")
+    try require(!buttons.contains { $0.action == NSSelectorFromString("makeViewDefault") }, "Making a view the default is rare, so it must not be a toolbar button")
+    let options = button("showFolderViewOptions:")
+    try require(options.image != nil && options.accessibilityLabel() == "More folder view options", "A chevron beside Reset must offer the default-view option")
+    try require(reset.isEnabled && reset.title == "Reset" && reset.imagePosition == .imageLeading, "Reset must be a labelled button while this folder has its own settings")
+    browser.window!.setContentSize(NSSize(width: 900, height: 740)); browser.window!.contentView!.layoutSubtreeIfNeeded()
+    try require(browser.window!.contentView!.bounds.contains(options.convert(options.bounds, to: browser.window!.contentView!)), "The chevron must stay visible in a narrow window")
+    browser.window!.setContentSize(NSSize(width: 1120, height: 740)); browser.window!.contentView!.layoutSubtreeIfNeeded()
+    NSApp.sendAction(NSSelectorFromString("makeViewDefault"), to: browser, from: options)
+    try waitUntil { !reset.isEnabled }
+    try require(visibility.defaultShowsHidden && !visibility.hasOverride(for: a) && !store.hasOverride(for: a), "Use as default must make this folder's hidden-file and view settings the default")
+    try require(store.defaultView.sort == .size && !store.defaultView.foldersFirst, "Use as default must carry this folder's sort into the default view")
+    button("toggleFolderHidden").performClick(nil)
+    try waitUntil { reset.isEnabled }
+    reset.performClick(nil)
+    try waitUntil { !reset.isEnabled && !visibility.hasOverride(for: a) }
+    print("PASS: Captioned toolbar groups, one-click sort chips and direction, folders first, and folder Default and Reset")
 }

@@ -20,7 +20,7 @@ func checkServerConnections() throws {
         browser.window!.setContentSize(NSSize(width: width, height: 740))
         root.layoutSubtreeIfNeeded()
         let frame = toolbarConnect.convert(toolbarConnect.bounds, to: root)
-        try require(root.bounds.contains(frame) && frame.size == NSSize(width: 30, height: 30) && toolbarConnect.imagePosition == .imageOnly, "Server connection must use one standard square toolbar icon")
+        try require(root.bounds.contains(frame) && frame.size == NSSize(width: 28, height: 28) && toolbarConnect.imagePosition == .imageOnly, "Server connection must use one standard square toolbar icon")
         let path = descendants(root).compactMap { $0 as? NSTextField }.first { $0.accessibilityLabel() == "Current folder path" }!
         let search = descendants(root).compactMap { $0 as? NSTextField }.first { $0.accessibilityLabel() == "Search this folder" }!
         var searchSurface: NSView = search
@@ -35,7 +35,7 @@ func checkServerConnections() throws {
         try require(path.frame.width > 150 && abs(searchFrame.maxX - (root.bounds.maxX - 20)) < 1, "Search must retain its original right-aligned position")
         let favorite = descendants(root).compactMap { $0 as? NSButton }.first { $0.accessibilityLabel() == "Add selected folder to Favorites" }!
         let favoriteFrame = favorite.convert(favorite.bounds, to: root)
-        try require(abs(frame.midY - favoriteFrame.midY) < 1 && frame.minX - favoriteFrame.maxX >= 24, "Server icon must sit to the right of Favorites with a clear gap")
+        try require(abs(frame.midY - favoriteFrame.midY) < 1 && frame.minX >= favoriteFrame.maxX && frame.minX - favoriteFrame.maxX < 30, "Server icon must sit right after Favorite, each with its own caption")
     }
     toolbarConnect.performClick(nil)
     try require(delegate.connections == 1, "The toolbar button must open the app's connection dialog")

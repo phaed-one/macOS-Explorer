@@ -135,7 +135,7 @@ do {
     app.setActivationPolicy(.prohibited)
     try require(!controlWindow.isVisible, "Custom close must close the window instead of beeping")
     print("PASS: Custom window buttons close, minimize, maximize, and restore")
-    for button in descendants(window.contentView!).compactMap({ $0 as? GlassToolbarButton }) {
+    for button in descendants(window.contentView!).compactMap({ $0 as? GlassToolbarButton }) where !button.drawsOutline || button.imagePosition == .imageOnly {
         try require(abs(button.frame.width - button.frame.height) < 0.5, "Toolbar buttons must have square frames, including native alignment insets")
     }
     let headerFields = descendants(window.contentView!).compactMap { $0 as? HeaderTextField }
@@ -357,6 +357,7 @@ do {
     try checkFileViewerRequests()
     try checkTrashInterface()
     try checkFavoriteAndVisibilityControls()
+    try checkSortChipsAndFolderDefaults()
     try checkFavoriteReordering()
     try checkInitialFavoriteOrder()
     try checkTerminalIntegration()

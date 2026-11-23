@@ -72,8 +72,18 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     var canTransferTabs: Bool { !busy }
     private let iconSlider = LiveSlider(value: 64, minValue: 32, maxValue: 160, target: nil, action: nil)
     private let spacingSlider = LiveSlider(value: 10, minValue: 0, maxValue: 40, target: nil, action: nil)
-    private let viewMenu = NSMenu(), sortMenu = NSMenu()
     private var resetViewButton: NSButton?
+    private let sortTrack = ChipTrack()
+    private var sortKeys: [FileSort] = []
+    private var sortChips: [SortChipButton] = []
+    private var sortDirectionButton: SortChipButton?
+    /// Labelled buttons that fall back to icons when the window is too narrow for their text.
+    private var pills: [(button: NSButton, width: NSLayoutConstraint, full: CGFloat)] = []
+    /// Captions on the right-hand buttons, which hide in a narrow window.
+    private var trailingCaptions: [(label: NSTextField, text: String)] = []
+    private var commandsRow: NSStackView?
+    private var iconWell = NSView(), spacingWell = NSView()
+    private var foldersFirstButton: NSButton?
     private let openWithMenu = OpenWithMenu()
     private let viewToggle = NSSegmentedControl()
     private let viewStore = FolderViewStore()
@@ -90,7 +100,6 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     private let search = HeaderTextField(symbol: "magnifyingglass")
     private var fieldSurfaces: [NSView] = []
     private let status = NSTextField(labelWithString: "")
-    private let hidden = GlassToolbarButton()
     private let folderHidden = GlassToolbarButton()
     private var current: URL { get { tabs.current.url } set { tabs.current.url = newValue } }
     private var entries: [FileEntry] = []
@@ -134,6 +143,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         tabStrip.onDrop = { [weak self] urls, destination, move in self?.transfer(urls, into: destination, move: move) }
         tabStrip.update(tabs)
         NotificationCenter.default.addObserver(self, selector: #selector(appearanceChanged), name: BrowserTheme.changed, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(windowResized), name: NSWindow.didResizeNotification, object: window)
         appearanceChanged()
         restoringView = false
         window.contentView?.layoutSubtreeIfNeeded()
@@ -181,7 +191,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         NotificationCenter.default.removeObserver(self)
     }
 
-    private func button(_ symbol: String, _ title: String, _ action: Selector, size: CGFloat = 30) -> NSButton {
+    private func button(_ symbol: String, _ title: String, _ action: Selector, size: CGFloat = 28) -> NSButton {
         let button = GlassToolbarButton(image: NSImage(systemSymbolName: symbol, accessibilityDescription: title)!, target: self, action: action)
         button.bezelStyle = .texturedRounded
         button.isBordered = false; button.contentTintColor = .labelColor
@@ -203,27 +213,15 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             background.translatesAutoresizingMaskIntoConstraints = false
             root.addSubview(background)
         }
-        hidden.title = "Hidden files"
-        hidden.image = NSImage(systemSymbolName: "eye", accessibilityDescription: nil)
-        folderHidden.image = ToolbarImages.folderEye
-        for control in [hidden, folderHidden] {
-            control.setButtonType(.toggle); control.bezelStyle = .texturedRounded
-            control.isBordered = false; control.imagePosition = .imageOnly
-            control.contentTintColor = .labelColor
-            control.widthAnchor.constraint(equalToConstant: 30).isActive = true
-            control.heightAnchor.constraint(equalToConstant: 30).isActive = true
-            control.target = self
-        }
-        hidden.action = #selector(toggleHidden)
-        hidden.setAccessibilityLabel("Show hidden files by default")
-        ToolbarHelp.install(on: hidden, text: "Show hidden files by default (⌘⇧.). Folders can override this.")
-        folderHidden.action = #selector(toggleFolderHidden)
+        folderHidden.image = NSImage(systemSymbolName: "eye", accessibilityDescription: nil)?.withSymbolConfiguration(.init(pointSize: 15, weight: .regular))
+        folderHidden.setButtonType(.momentaryPushIn); folderHidden.showsOnState = true; folderHidden.bezelStyle = .texturedRounded
+        folderHidden.isBordered = false; folderHidden.imagePosition = .imageOnly
+        folderHidden.contentTintColor = .labelColor
+        folderHidden.widthAnchor.constraint(equalToConstant: 28).isActive = true
+        folderHidden.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        folderHidden.target = self; folderHidden.action = #selector(toggleFolderHidden)
         folderHidden.setAccessibilityLabel("Show hidden files in this folder")
-        ToolbarHelp.install(on: folderHidden, text: "Show hidden files in this folder — saved for this folder only")
-        let hiddenMenu = NSMenu()
-        hiddenMenu.addItem(withTitle: "Use default hidden-file setting for this folder", action: #selector(useDefaultHiddenFiles), keyEquivalent: "").target = self
-        folderHidden.menu = hiddenMenu
-        updateHiddenControls()
+        ToolbarHelp.install(on: folderHidden, text: "Show hidden files in this folder. ⌘⇧. changes the default for all folders.")
         search.placeholderString = "Search this folder and subfolders"
         search.hidesPlaceholderWhileEditing = true
         search.setAccessibilityLabel("Search this folder")
@@ -232,22 +230,17 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         search.font = .systemFont(ofSize: 14)
         search.heightAnchor.constraint(equalToConstant: 36).isActive = true
         search.widthAnchor.constraint(equalToConstant: 280).isActive = true
-        // A chevron-only pull-down: its first item is the (empty) button title.
-        let viewControl = NSPopUpButton(frame: .zero, pullsDown: true)
-        viewControl.isBordered = false
-        viewControl.widthAnchor.constraint(equalToConstant: 30).isActive = true
-        ToolbarHelp.install(on: viewControl, text: "Folder view options")
-        viewControl.setAccessibilityLabel("View options")
-        viewMenu.addItem(withTitle: "", action: nil, keyEquivalent: "")
-        viewMenu.addItem(withTitle: "Make Current View the Default", action: #selector(makeViewDefault), keyEquivalent: "").target = self
-        viewControl.menu = viewMenu
-        let resetView = button("arrow.counterclockwise", "Reset this folder to the default view", #selector(restoreViewDefault))
+        let folderOptions = button("chevron.down", "More folder view options", #selector(showFolderViewOptions(_:)), size: 22)
+        folderOptions.setAccessibilityLabel("More folder view options")
+        let resetView = pillButton("arrow.counterclockwise", "Reset", "Reset this folder to the default view and hidden-file setting", #selector(restoreViewDefault))
+        resetView.setAccessibilityLabel("Reset this folder to the default")
         resetViewButton = resetView
+        updateHiddenControls()
         viewToggle.segmentCount = 3
         viewToggle.setImage(NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: "Icons view"), forSegment: 0)
         viewToggle.setImage(NSImage(systemSymbolName: "list.bullet", accessibilityDescription: "List view"), forSegment: 1)
         viewToggle.setImage(NSImage(systemSymbolName: "tablecells", accessibilityDescription: "Details view"), forSegment: 2)
-        for segment in 0..<3 { viewToggle.setWidth(30, forSegment: segment) }
+        for segment in 0..<3 { viewToggle.setWidth(28, forSegment: segment) }
         viewToggle.trackingMode = .selectOne
         viewToggle.target = self; viewToggle.action = #selector(changeViewSegment(_:))
         viewToggle.setAccessibilityLabel("Folder view")
@@ -255,18 +248,23 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             let third = (viewToggle?.bounds.width ?? 90) / 3
             return point.x < third ? "Icons view" : point.x < 2 * third ? "List view" : "Details view"
         })
-        let sortControl = NSPopUpButton(frame: .zero, pullsDown: true)
-        sortMenu.delegate = self; sortControl.menu = sortMenu
-        rebuildSortMenu()
-        ToolbarHelp.install(on: sortControl, text: "Sort files and folders")
+        sortTrack.spacing = 1; sortTrack.edgeInsets = NSEdgeInsets(top: 2, left: 2, bottom: 2, right: 2)
+        sortTrack.setAccessibilityElement(true); sortTrack.setAccessibilityRole(.radioGroup); sortTrack.setAccessibilityLabel("Sort by")
+        let sortDirection = SortChipButton(title: "", image: NSImage(systemSymbolName: "arrow.up", accessibilityDescription: nil), target: self, action: #selector(toggleSortDirection))
+        ToolbarHelp.install(on: sortDirection, text: "Ascending — click for descending")
+        sortDirectionButton = sortDirection
+        let foldersFirst = button("folder", "Keep folders above files", #selector(toggleFoldersFirst))
+        (foldersFirst as? GlassToolbarButton)?.showsOnState = true
+        foldersFirstButton = foldersFirst
+        updateSortControls()
         iconSlider.target = self; iconSlider.action = #selector(iconSizeChanged)
         iconSlider.isContinuous = true
-        iconSlider.widthAnchor.constraint(equalToConstant: 90).isActive = true
+        iconSlider.widthAnchor.constraint(equalToConstant: 50).isActive = true
         iconSlider.setAccessibilityLabel("Icon size")
         ToolbarHelp.install(on: iconSlider, text: "Icon size")
         spacingSlider.target = self; spacingSlider.action = #selector(iconSpacingChanged)
         spacingSlider.isContinuous = true; spacingSlider.controlSize = .small
-        spacingSlider.widthAnchor.constraint(equalToConstant: 56).isActive = true
+        spacingSlider.widthAnchor.constraint(equalToConstant: 40).isActive = true
         spacingSlider.setAccessibilityLabel("Icon spacing")
         ToolbarHelp.install(on: spacingSlider, text: "Spacing — tight to wide. Icons and List each keep their own.")
         window.titleVisibility = .hidden
@@ -309,23 +307,40 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         NSLayoutConstraint.activate([updateBadge.widthAnchor.constraint(equalToConstant: 8), updateBadge.heightAnchor.constraint(equalToConstant: 8), updateBadge.trailingAnchor.constraint(equalTo: settings.trailingAnchor), updateBadge.topAnchor.constraint(equalTo: settings.topAnchor)])
         NotificationCenter.default.addObserver(self, selector: #selector(updateIndicatorChanged), name: AppUpdater.changed, object: nil)
         updateIndicatorChanged()
-        let commands = NSStackView(views: [
-            creationButtons[0], creationButtons[1],
-            divider(), button("scissors", "Cut (⌘X)", #selector(cutFiles)),
+        // The switcher's own track is nearly black here; a grey track behind it shows the unselected modes.
+        // The native slider track is nearly black here too; a grey strip behind it matches the chip tracks.
+        iconWell = SliderWell(iconSlider, fillAlpha: 0.03); spacingWell = SliderWell(spacingSlider, fillAlpha: 0.03)
+        let viewTrack = ChipTrack(views: [viewToggle])
+        viewTrack.edgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+        viewTrack.fillAlpha = 0.05  // Plus the switcher's own faint track, this matches the sort chips' grey.
+        let edit = [
+            button("scissors", "Cut (⌘X)", #selector(cutFiles)),
             button("rectangle.portrait.on.rectangle.portrait", "Copy (⌘C)", #selector(copyFiles)),
             button("clipboard", "Paste (⌘V)", #selector(pasteFiles)),
             button("pencil", "Rename (F2)", #selector(rename)),
-            button("trash", "Move to Trash (⌘Delete)", #selector(trash)),
-            divider(), sortControl, viewToggle, resetView, viewControl, iconSlider, spacingSlider, divider(), hidden, folderHidden,
-            favorite, connect, spacer,
-            settings
+            button("trash", "Move to Trash (⌘Delete)", #selector(trash))
+        ]
+        let commands = NSStackView(views: [
+            toolbarGroup("New", creationButtons), divider(),
+            toolbarGroup("Edit", edit), divider(),
+            toolbarGroup("View", [viewTrack, iconWell, spacingWell]), divider(),
+            toolbarGroup("Sort", [sortTrack, foldersFirst]), divider(),
+            toolbarGroup("This folder", [folderHidden, resetView, folderOptions]),
+            spacer,
+            toolbarGroup("Favorite", [favorite]),
+            toolbarGroup("Server", [connect]),
+            toolbarGroup("Settings", [settings])
         ])
-        commands.spacing = 5; commands.heightAnchor.constraint(equalToConstant: 36).isActive = true
-        commands.setCustomSpacing(24, after: favorite)
-        commands.setCustomSpacing(4, after: iconSlider)
+        commandsRow = commands
+        trailingCaptions = commands.arrangedSubviews.suffix(3).compactMap { group in
+            guard let label = (group as? NSStackView)?.arrangedSubviews.last as? NSTextField else { return nil }
+            return (label, label.stringValue)
+        }
+        commands.spacing = 4; commands.alignment = .top
+        commands.heightAnchor.constraint(equalToConstant: 46).isActive = true
         let top = NSStackView(views: [navigation, commands])
-        top.orientation = .vertical; top.alignment = .leading; top.spacing = 10
-        top.heightAnchor.constraint(equalToConstant: 98).isActive = true
+        top.orientation = .vertical; top.alignment = .leading; top.spacing = 6
+        top.heightAnchor.constraint(equalToConstant: 104).isActive = true
         for row in [navigation, commands] { row.widthAnchor.constraint(equalTo: top.widthAnchor).isActive = true }
         split.isVertical = true; split.dividerStyle = .thin; split.delegate = self
         sidebarPane.widthAnchor.constraint(greaterThanOrEqualToConstant: 170).isActive = true
@@ -365,8 +380,8 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             titlebarChrome.topAnchor.constraint(equalTo: root.topAnchor), titlebarChrome.leadingAnchor.constraint(equalTo: root.leadingAnchor), titlebarChrome.trailingAnchor.constraint(equalTo: root.trailingAnchor), titlebarChrome.bottomAnchor.constraint(equalTo: topChrome.topAnchor),
             topChrome.topAnchor.constraint(equalTo: tabStrip.bottomAnchor), topChrome.leadingAnchor.constraint(equalTo: root.leadingAnchor), topChrome.trailingAnchor.constraint(equalTo: root.trailingAnchor), topChrome.bottomAnchor.constraint(equalTo: split.topAnchor),
             tabStrip.topAnchor.constraint(equalTo: root.topAnchor), tabStrip.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 94), tabStrip.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -12), tabStrip.heightAnchor.constraint(equalToConstant: 46),
-            top.topAnchor.constraint(equalTo: tabStrip.bottomAnchor, constant: 10), top.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20), top.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
-            split.topAnchor.constraint(equalTo: top.bottomAnchor, constant: 14), split.leadingAnchor.constraint(equalTo: root.leadingAnchor), split.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            top.topAnchor.constraint(equalTo: tabStrip.bottomAnchor, constant: 8), top.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20), top.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
+            split.topAnchor.constraint(equalTo: top.bottomAnchor, constant: 10), split.leadingAnchor.constraint(equalTo: root.leadingAnchor), split.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             status.topAnchor.constraint(equalTo: split.bottomAnchor, constant: 7), status.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -7), status.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16), status.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -16)
         ])
         installWindowControls(in: root, window: window)
@@ -393,10 +408,52 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         }
     }
     private func divider() -> NSView {
-        let separator = NSBox(); separator.boxType = .separator
+        let separator = ToolbarDivider()
         separator.widthAnchor.constraint(equalToConstant: 1).isActive = true
-        separator.heightAnchor.constraint(equalToConstant: 22).isActive = true
+        separator.heightAnchor.constraint(equalToConstant: 42).isActive = true
         return separator
+    }
+    /// An outlined icon-and-text button, like Default and Reset.
+    private func pillButton(_ symbol: String, _ title: String, _ help: String, _ action: Selector) -> NSButton {
+        let button = GlassToolbarButton(title: title, image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil)!
+            .withSymbolConfiguration(.init(pointSize: 12, weight: .medium))!, target: self, action: action)
+        button.bezelStyle = .texturedRounded; button.isBordered = false
+        button.imagePosition = .imageLeading; button.imageHugsTitle = true
+        button.font = .systemFont(ofSize: 12.5); button.contentTintColor = .labelColor
+        button.drawsOutline = true
+        ToolbarHelp.install(on: button, text: help)
+        let full = ceil(button.intrinsicContentSize.width) + 18
+        let width = button.widthAnchor.constraint(equalToConstant: full); width.isActive = true
+        button.heightAnchor.constraint(equalToConstant: 26).isActive = true
+        pills.append((button, width, full))
+        return button
+    }
+    /// Labels on Default, Reset, and Settings give way to icons when the window is too narrow for them.
+    private func updateToolbarDensity() {
+        guard let commands = commandsRow, let width = window?.contentView?.bounds.width, width > 0 else { return }
+        func setCompact(_ compact: Bool) {
+            for pill in pills {
+                pill.button.imagePosition = compact ? .imageOnly : .imageLeading
+                pill.width.constant = compact ? 26 : pill.full
+            }
+            for caption in trailingCaptions { caption.label.stringValue = compact ? "" : caption.text }
+        }
+        setCompact(false)
+        setCompact(commands.fittingSize.width > width - 40)
+    }
+    /// A row of toolbar controls with a small caption under it, so each group says what it is for.
+    private func toolbarGroup(_ caption: String, _ controls: [NSView], showsCaption: Bool = true) -> NSView {
+        let row = NSStackView(views: controls)
+        row.spacing = 2; row.alignment = .centerY
+        row.heightAnchor.constraint(equalToConstant: 30).isActive = true
+        let label = NSTextField(labelWithString: showsCaption ? caption : "")
+        label.alignment = .center
+        label.font = .systemFont(ofSize: 10.5); label.textColor = .secondaryLabelColor
+        label.setAccessibilityElement(false)
+        let group = NSStackView(views: [row, label])
+        group.orientation = .vertical; group.alignment = .centerX; group.spacing = 2
+        group.setAccessibilityElement(true); group.setAccessibilityRole(.group); group.setAccessibilityLabel(caption)
+        return group
     }
     private func installAncestorPathBar() {
         ancestorPathBar.onNavigate = { [weak self] in self?.navigate($0) }
@@ -582,7 +639,8 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         defer { restoringView = false }
         folderView = view
         viewFolder = current
-        resetViewButton?.isEnabled = viewStore.hasOverride(for: current)
+        updateDefaultButtons()
+        updateSortControls()
         viewToggle.selectedSegment = view.mode == .icons ? 0 : view.mode == .list ? 1 : 2
         if search.stringValue != view.filter { search.stringValue = view.filter }
         updateHiddenControls()
@@ -636,29 +694,62 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     private func updateSizeSliderVisibility() {
         iconSlider.isHidden = isSearching || folderView.mode != .icons
         spacingSlider.isHidden = isSearching || folderView.mode == .details
+        iconWell.isHidden = iconSlider.isHidden; spacingWell.isHidden = spacingSlider.isHidden
+        updateToolbarDensity()
     }
     private func saveView() {
         guard !restoringView, let viewFolder else { return }
         viewStore.save(folderView, for: viewFolder)
-        resetViewButton?.isEnabled = true
+        updateDefaultButtons()
     }
-    private func rebuildSortMenu() {
-        sortMenu.removeAllItems()
-        sortMenu.addItem(withTitle: "Sort", action: nil, keyEquivalent: "")
-        let sorts: [(FileSort, String)] = [(.name, "Name (Alphabetical)")] + (current == TrashStore.location ? [(.deleted, "Date Deleted")] : [])
-            + [(.modified, "Date Modified"), (.kind, "Kind"), (.size, "Size")]
-        for (key, label) in sorts {
-            let item = sortMenu.addItem(withTitle: label, action: #selector(changeSort(_:)), keyEquivalent: "")
-            item.target = self; item.representedObject = key.rawValue; item.state = sortKey == key ? .on : .off
+    private static func sortTitle(_ key: FileSort) -> String {
+        switch key {
+        case .name: return "Name"
+        case .deleted: return "Deleted"
+        case .modified: return "Date"
+        case .size: return "Size"
+        case .kind: return "Kind"
         }
-        sortMenu.addItem(.separator())
-        for (label, value) in [("Ascending", true), ("Descending", false)] {
-            let item = sortMenu.addItem(withTitle: label, action: #selector(changeSortDirection(_:)), keyEquivalent: "")
-            item.target = self; item.representedObject = value; item.state = ascending == value ? .on : .off
+    }
+    /// One-click sort chips; only the Trash has Date Deleted.
+    private func updateSortControls() {
+        guard sortDirectionButton != nil else { return }  // The toolbar isn't built yet.
+        let keys: [FileSort] = [.name] + (current == TrashStore.location ? [.deleted] : []) + [.modified, .size, .kind]
+        if keys != sortKeys {
+            sortKeys = keys
+            sortChips.forEach { $0.removeFromSuperview() }
+            sortChips = keys.map { key in
+                let chip = SortChipButton(title: Self.sortTitle(key), target: self, action: #selector(changeSortChip(_:)))
+                chip.setAccessibilityLabel("Sort by \(Self.sortTitle(key).lowercased())")
+                ToolbarHelp.install(on: chip, text: "Sort by \(Self.sortTitle(key).lowercased()). Click again to reverse the order.")
+                return chip
+            }
+            sortTrack.setViews(sortChips + [sortDirectionButton].compactMap { $0 }, in: .leading)
         }
-        sortMenu.addItem(.separator())
-        let first = sortMenu.addItem(withTitle: "Folders First", action: #selector(toggleFoldersFirst), keyEquivalent: "")
-        first.target = self; first.state = folderView.foldersFirst ? .on : .off
+        for (chip, key) in zip(sortChips, keys) { chip.isSelected = key == sortKey }
+        if let direction = sortDirectionButton {
+            let text = ascending ? "Ascending — click for descending" : "Descending — click for ascending"
+            direction.image = NSImage(systemSymbolName: ascending ? "arrow.up" : "arrow.down", accessibilityDescription: text)
+            direction.needsDisplay = true
+            direction.setAccessibilityLabel(ascending ? "Sort ascending" : "Sort descending")
+            ToolbarHelp.update(on: direction, text: text)
+        }
+        foldersFirstButton?.state = folderView.foldersFirst ? .on : .off
+        updateToolbarDensity()
+    }
+    /// Default and Reset only matter when this folder has its own view or hidden-file choice.
+    private func updateDefaultButtons() {
+        let custom = viewStore.hasOverride(for: current) || hiddenFiles.hasOverride(for: current)
+        resetViewButton?.isEnabled = custom
+    }
+    /// Making a folder's view the default is rare, so it sits behind the chevron beside Reset.
+    @objc private func showFolderViewOptions(_ sender: NSButton) {
+        let menu = NSMenu(); menu.autoenablesItems = false
+        let custom = viewStore.hasOverride(for: current) || hiddenFiles.hasOverride(for: current)
+        let item = menu.addItem(withTitle: "Use This Folder's View as the Default", action: #selector(makeViewDefault), keyEquivalent: "")
+        item.target = self; item.isEnabled = custom
+        if !custom { menu.addItem(withTitle: "This folder already uses the default view", action: nil, keyEquivalent: "").isEnabled = false }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.isFlipped ? sender.bounds.maxY + 4 : -4), in: sender)
     }
     @objc private func changeViewSegment(_ sender: NSSegmentedControl) {
         let mode: FolderViewMode = sender.selectedSegment == 0 ? .icons : sender.selectedSegment == 1 ? .list : .details
@@ -678,21 +769,29 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     }
     @objc private func makeViewDefault() {
         var defaults = folderView; defaults.filter = ""
+        let shows = showHidden
         viewStore.makeDefault(defaults)
-        status.stringValue = "Current view is now the default for folders without a saved view."
+        // This folder now follows the default it just set, so Default and Reset dim.
+        if current != TrashStore.location { viewStore.restoreDefault(for: current) }
+        hiddenFiles.useDefault(for: current)
+        hiddenFiles.defaultShowsHidden = shows
+        updateDefaultButtons()
+        status.stringValue = "This folder's view is now the default for folders without their own settings."
     }
     @objc private func restoreViewDefault() {
-        viewStore.restoreDefault(for: current); navigate(current)
+        viewStore.restoreDefault(for: current)
+        hiddenFiles.useDefault(for: current)
+        navigate(current)
     }
-    @objc private func changeSort(_ sender: NSMenuItem) {
-        guard let value = sender.representedObject as? String, let sort = FileSort(rawValue: value) else { return }
-        sortKey = sort; saveView(); applyView(folderView); applyFilter()
+    @objc private func changeSortChip(_ sender: SortChipButton) {
+        guard let index = sortChips.firstIndex(where: { $0 === sender }), sortKeys.indices.contains(index) else { return }
+        let key = sortKeys[index]
+        // Clicking the selected chip again reverses the order, like a column header.
+        if key == sortKey { ascending.toggle() } else { sortKey = key }
+        saveView(); applyView(folderView); applyFilter()
     }
-    @objc private func changeSortDirection(_ sender: NSMenuItem) {
-        guard let value = sender.representedObject as? Bool else { return }
-        ascending = value; saveView(); applyView(folderView); applyFilter()
-    }
-    @objc private func toggleFoldersFirst() { folderView.foldersFirst.toggle(); saveView(); applyFilter() }
+    @objc private func toggleSortDirection() { ascending.toggle(); saveView(); applyView(folderView); applyFilter() }
+    @objc private func toggleFoldersFirst() { folderView.foldersFirst.toggle(); saveView(); updateSortControls(); applyFilter() }
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let entry = visible[row]
         let key = tableColumn!.identifier.rawValue
@@ -736,7 +835,6 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         settingsButton?.setAccessibilityLabel(available ? "Settings — update available" : "Settings")
     }
     func menuNeedsUpdate(_ menu: NSMenu) {
-        if menu === sortMenu { rebuildSortMenu(); return }
         menu.removeAllItems()
         let groups: [[MenuAction]]
         if isTrashBrowsing {
@@ -827,10 +925,12 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         hiddenFiles.defaultShowsHidden.toggle()
     }
     @objc private func toggleFolderHidden() { hiddenFiles.set(!showHidden, for: current) }
-    @objc private func useDefaultHiddenFiles() { hiddenFiles.useDefault(for: current) }
     private func updateHiddenControls() {
-        hidden.state = hiddenFiles.defaultShowsHidden ? .on : .off
         folderHidden.state = showHidden ? .on : .off
+        let action = showHidden ? "Hide hidden files in this folder" : "Show hidden files in this folder"
+        folderHidden.setAccessibilityLabel(action)
+        ToolbarHelp.update(on: folderHidden, text: action + ". ⌘⇧. changes the default for all folders.")
+        updateDefaultButtons()
     }
     @objc private func hiddenFilesChanged(_ notification: Notification) {
         if let folder = notification.userInfo?["folder"] as? URL {
@@ -1257,7 +1357,9 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
     @objc private func connectToServer() {
         (NSApplication.shared.delegate as? ServerConnectionPresenting)?.connectToServer()
     }
+    @objc private func windowResized() { updateToolbarDensity() }
     @objc private func appearanceChanged() {
+        updateHiddenControls(); updateSortControls()
         guard let window, let root = window.contentView else { return }
         root.effectiveAppearance.performAsCurrentDrawingAppearance {
             BrowserTheme.paint(root, color: .clear)
