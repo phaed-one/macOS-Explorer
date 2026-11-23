@@ -16,18 +16,15 @@ Windows File Explorer's editable path bar, full-disk folder tree, combined with 
 
 ## What Finder doesn't have
 
-- An editable path bar, always visible. Type absolute, relative or `~` paths, with folder suggestions as you type.
-- A sidebar folder tree of the whole disk, starting at `/`, with every mounted drive. App bundles expand like folders.
-- Hidden files shown for one folder only, or for all folders. `/` shows `/usr`, `/bin` and other hidden system folders out of the box.
+- An always-visible, editable path bar with folder suggestions. Takes absolute, relative and `~` paths.
+- A sidebar tree of the whole disk from `/`, including hidden system folders and every mounted drive. App bundles open like folders.
+- Hidden files per folder, not just on or off everywhere.
 - New empty files, from the toolbar or the right-click menu.
-- Windows-style keys: F2 renames, Return opens.
-- Drag tabs out to create new windows.
-- Drag files and folders onto other tabs to copy them; right-drag to move them.
-- Adjust icon size and spacing with separate toolbar sliders.
-- Connect to network servers and browse shared folders.
-- Search that covers the current folder and its subfolders by default, using the Spotlight index.
-- A permissions editor that takes octal (`755`) or chmod-style strings (`u+x,go-w`).
-- Liquid Glass windows and dialogs on macOS 26, in five glass and blur styles, with optional tint and opacity, plus custom titlebar tint, accent color and window outline.
+- Windows keys: F2 renames, Return opens.
+- Right-drag to move files; drop them on a tab to copy them there.
+- Open any folder in your terminal app of choice, including iTerm2, Warp, Ghostty, kitty and WezTerm.
+- A permissions editor that takes octal (`755`) or chmod strings (`u+x,go-w`).
+- Glass styles, tint and opacity, plus custom titlebar, accent and outline colors.
 
 ## Install
 
@@ -43,7 +40,8 @@ the engines that completed the latest release scan; click it for the full report
 
 ## Build from source
 
-You need macOS 14 or later and Xcode 16 or later (or its command-line tools).
+You need macOS 14 or later and Xcode 16 or later. Xcode's command-line tools
+are enough: `xcode-select --install`.
 
 ```sh
 git clone https://github.com/phaed-one/macOS-Explorer.git
@@ -51,39 +49,33 @@ cd macOS-Explorer
 zsh scripts/build-from-source.sh --install
 ```
 
-This builds Explorer, installs it in **Applications** and opens it. Leave out
-`--install` to build `build/Explorer.app` without installing. To keep macOS
-permissions such as Full Disk Access across rebuilds, run
-`zsh scripts/setup-signing.sh` once first; it creates a local signing identity
-in your Keychain. Release packaging is described in
-[Development](docs/development.md).
+The script compiles Explorer, puts it in **Applications** and opens it. It needs
+no keys or accounts, and it doesn't change the version or create release files.
 
-## Using Explorer
+- **Build without installing:** run `zsh scripts/build-from-source.sh`. The app
+  is saved as `build/Explorer.app`.
+- **Update a source build:** run `git pull`, then run the script again.
+- **Keep permissions across rebuilds:** run `zsh scripts/setup-signing.sh` once
+  before building. It creates a signing identity in your Keychain. Without it,
+  each build is signed ad hoc, and macOS asks again for permissions such as
+  Full Disk Access.
+
+Packaging and publishing releases are covered in the
+[development guide](docs/development.md).
+
+## Privacy and permissions
 
 Explorer does not send your local files, searches, or navigation history to the
 developer. Update hosting receives ordinary connection metadata, and browsing
 network or cloud folders can communicate with their servers. See
 [Privacy and network activity](docs/privacy.md) for details.
 
-In Settings → Show in Finder, choose **Use Explorer** to open “Show in Finder”
-requests in Explorer. Folders opened from the desktop or Dock still use Finder.
-
 If protected folders are blocked, Explorer shows a setup window at launch. Enable
 Full Disk Access using its Settings button; the window closes when access works.
 Restart Explorer if macOS asks.
 
-Click the server icon to the right of Favorites on the toolbar (⌘K) and enter an address, such as
-`smb://server/share`. Sign in if asked, then browse the share in Explorer.
-SMB, AFP, NFS, and WebDAV servers are supported.
-
-Right-click a folder or empty space to open a terminal in that folder. Explorer
-finds your installed terminals and offers a choice when you have several.
-
-Supported terminals: **Terminal, iTerm2, Warp, Warp Preview, Ghostty, kitty,
-Alacritty, WezTerm, Hyper, Tabby, Rio, Contour, Cool Retro Term, and cmux**.
-
-An orange dot on Settings means an update is available. Open Settings and click
-**Update** to install it and restart Explorer.
+In Settings → Show in Finder, choose **Use Explorer** to open “Show in Finder”
+requests in Explorer. Folders opened from the desktop or Dock still use Finder.
 
 ## Not supported yet
 
