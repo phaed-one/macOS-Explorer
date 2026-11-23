@@ -12,8 +12,6 @@
 
 ![Explorer Settings over the main window](docs/screenshot-settings.webp)
 
-Windows File Explorer's editable path bar, full-disk folder tree, combined with Finder's Spotlight search, Trash put-back and native look. Multi-tab and multi-window. Native AppKit with built-in updates. Requires macOS 14; Liquid Glass on macOS 26.
-
 ## What Finder doesn't have
 
 - An always-visible, editable path bar with folder suggestions. Takes absolute, relative and `~` paths.
@@ -29,7 +27,7 @@ Windows File Explorer's editable path bar, full-disk folder tree, combined with 
 
 ## Install
 
-Download the ZIP from the [latest release](https://github.com/phaed-one/macOS-Explorer/releases/latest),
+Requires macOS 14 or later. Download the ZIP from the [latest release](https://github.com/phaed-one/macOS-Explorer/releases/latest),
 unzip it, and move **Explorer.app** into **Applications**.
 
 Each release ZIP is scanned with VirusTotal. The badge shows detections across
