@@ -61,9 +61,6 @@ no keys or accounts, and it doesn't change the version or create release files.
   each build is signed ad hoc, and macOS asks again for permissions such as
   Full Disk Access.
 
-Packaging and publishing releases are covered in the
-[development guide](docs/development.md).
-
 ## Privacy and permissions
 
 Explorer does not send your local files, searches, or navigation history to the
@@ -104,8 +101,3 @@ requests in Explorer. Folders opened from the desktop or Dock still use Finder.
 | New window | ⌘N |
 | Connect to server | ⌘K |
 | Settings | ⌘, |
-
-## Development
-
-See the [development guide](docs/development.md) for building, testing, signing,
-and publishing releases.
