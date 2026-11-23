@@ -63,9 +63,10 @@ no keys or accounts, and it doesn't change the version or create release files.
 
 ## Privacy and permissions
 
-Explorer does not send your local files, searches, or navigation history to the
-developer. Update hosting receives ordinary connection metadata, and browsing
-network or cloud folders can communicate with their servers. See
+Explorer has no analytics or tracking. Your files, searches and browsing
+history stay on your Mac. The only time Explorer itself goes online is to check
+GitHub for updates. Network shares and cloud folders talk to their own servers,
+as they do in Finder. See
 [Privacy and network activity](docs/privacy.md) for details.
 
 If protected folders are blocked, Explorer shows a setup window at launch. Enable
