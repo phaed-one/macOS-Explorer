@@ -41,6 +41,23 @@ the engines that completed the latest release scan; click it for the full report
 [![VirusTotal release scan: 0 detections / 66 engines](https://img.shields.io/badge/VirusTotal-0%20%2F%2066-brightgreen)](https://www.virustotal.com/gui/file/801892230927f2bfc3c03709e0598dd0022c5aec297d7490625668f3c39f1263)
 <!-- VIRUSTOTAL_BADGE_END -->
 
+## Build from source
+
+You need macOS 14 or later and Xcode 16 or later (or its command-line tools).
+
+```sh
+git clone https://github.com/phaed-one/macOS-Explorer.git
+cd macOS-Explorer
+zsh scripts/build-from-source.sh --install
+```
+
+This builds Explorer, installs it in **Applications** and opens it. Leave out
+`--install` to build `build/Explorer.app` without installing. To keep macOS
+permissions such as Full Disk Access across rebuilds, run
+`zsh scripts/setup-signing.sh` once first; it creates a local signing identity
+in your Keychain. Release packaging is described in
+[Development](docs/development.md).
+
 ## Using Explorer
 
 Explorer does not send your local files, searches, or navigation history to the

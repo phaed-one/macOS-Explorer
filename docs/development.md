@@ -1,5 +1,9 @@
 # Development
 
+To build and install from source without any release keys, run
+`zsh scripts/build-from-source.sh --install`. It doesn't change the version or
+create release files. The steps below are for packaging releases.
+
 ## Build
 
 ```sh

@@ -3,8 +3,9 @@ import AppKit
 /// A toolbar group divider bright enough to read on the dark chrome.
 final class ToolbarDivider: NSView {
     override var intrinsicContentSize: NSSize { NSSize(width: 1, height: 42) }
+    /// A translucent wash of the text color: about #383838 over the black chrome.
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.labelColor.withAlphaComponent(0.28).setFill()
+        NSColor.labelColor.withAlphaComponent(0.22).setFill()
         bounds.fill()
     }
 }

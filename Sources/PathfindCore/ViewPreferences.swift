@@ -16,6 +16,8 @@ public struct FolderViewPreferences: Codable, Equatable, Sendable {
     public var filter = ""
     public var columnWidths: [String: Double] = [:]
     public var columnOrder: [String] = ["name", "modified", "kind", "size"]
+    /// Built-in spacing for views that never saved their own.
+    public static let defaultIconSpacing = 6.25, defaultListSpacing = 10.8
     public init() {}
 }
 

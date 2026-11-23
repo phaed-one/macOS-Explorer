@@ -654,7 +654,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
             column.width = max(70, view.columnWidths[column.identifier.rawValue] ?? defaultColumnWidth(column.identifier.rawValue))
         }
         icons.iconSize = min(160, max(32, view.iconSize))
-        let spacing = view.mode == .list ? view.listSpacing ?? 10 : view.iconSpacing ?? 10
+        let spacing = view.mode == .list ? view.listSpacing ?? FolderViewPreferences.defaultListSpacing : view.iconSpacing ?? FolderViewPreferences.defaultIconSpacing
         icons.iconSpacing = min(40, max(0, spacing))
         icons.currentFolder = current
         iconSlider.doubleValue = Double(icons.iconSize)
@@ -666,7 +666,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         let definitions: [(String, String, Double)] = isSearching
             ? [("name", "Name", 300), ("path", "Full Path", 600)]
             : [("name", "Name", 350)] + (current == TrashStore.location ? [("deleted", "Date Deleted", 170)] : [])
-                + [("modified", "Date modified", 170), ("kind", "Kind", 140), ("size", "Size", 85)]
+                + [("modified", "Date modified", 170), ("kind", "Kind", 140), ("size", "Size", 120)]
         guard Set(table.tableColumns.map { $0.identifier.rawValue }) != Set(definitions.map { $0.0 }) else { return }
         let wasRestoring = restoringView; restoringView = true
         defer { restoringView = wasRestoring }
@@ -689,7 +689,7 @@ final class BrowserController: NSWindowController, NSTableViewDataSource, NSTabl
         updateSizeSliderVisibility()
     }
     private func defaultColumnWidth(_ key: String) -> Double {
-        ["name": 350, "deleted": 170, "modified": 170, "kind": 140, "size": 85][key] ?? 100
+        ["name": 350, "deleted": 170, "modified": 170, "kind": 140, "size": 120][key] ?? 100
     }
     private func updateSizeSliderVisibility() {
         iconSlider.isHidden = isSearching || folderView.mode != .icons
