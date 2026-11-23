@@ -75,10 +75,6 @@ Restart Explorer if macOS asks.
 In Settings → Show in Finder, choose **Use Explorer** to open “Show in Finder”
 requests in Explorer. Folders opened from the desktop or Dock still use Finder.
 
-## Not supported yet
-
-- Finder tags
-
 ## Keyboard shortcuts
 
 | Action | Shortcut |
