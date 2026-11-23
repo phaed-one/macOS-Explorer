@@ -49,7 +49,7 @@ zsh scripts/build-from-source.sh --install
 ```
 
 The script compiles Explorer, puts it in **Applications** and opens it. It needs
-no keys or accounts, and it doesn't change the version or create release files.
+no keys or accounts.
 
 - **Build without installing:** run `zsh scripts/build-from-source.sh`. The app
   is saved as `build/Explorer.app`.
