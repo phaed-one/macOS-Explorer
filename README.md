@@ -92,11 +92,12 @@ requests in Explorer. Folders opened from the desktop or Dock still use Finder.
 | Open | Return |
 | Rename | F2 |
 | New folder | ⌘⇧N |
+| Undo / redo | ⌘Z / ⇧⌘Z |
 | Cut / copy / paste | ⌘X / ⌘C / ⌘V |
 | Duplicate | ⌘D |
 | Move to Trash | ⌘Delete |
 | Get Info | ⌘I |
-| Show hidden files | ⌘⇧. |
+| Show hidden files in all folders | ⌘⇧. |
 | New tab / close tab | ⌘T / ⌘W |
 | Next tab | ⌃Tab |
 | New window | ⌘N |
